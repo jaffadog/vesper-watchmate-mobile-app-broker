@@ -1,7 +1,7 @@
 # Vesper WatchMate Mobile App Broker
 Use the Vesper WatchMate mobile app with any AIS transponder
 
-![screenshot](https://github.com/jaffadog/vesper-watchmate-mobile-app-broker/blob/master/resources/collision_prev_1.png?raw=true "Screenshot")
+![](https://github.com/jaffadog/vesper-watchmate-mobile-app-broker/blob/master/resources/collision_prev_1.png?raw=true =200x)
 
 The very nice [Vesper WatchMate mobile app](https://www2.vespermarine.com/watchmate-ios) uses a proprietary protocol to interface with the Vesper "smartAIS" range of transponders (XB-8000 and WatchMate Vision). This proprietary protocol is a combination of NMEA over TCP and web services hosted on supported transponders.
 
