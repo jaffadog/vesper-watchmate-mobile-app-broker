@@ -1,7 +1,7 @@
 # Vesper WatchMate Mobile App Broker
 Use the Vesper WatchMate mobile app with any AIS transponder
 
-<img src="https://github.com/jaffadog/vesper-watchmate-mobile-app-broker/blob/master/resources/collision_prev_1.png?raw=true" alt="drawing" style="width:200px;"/>
+<img src="https://github.com/jaffadog/vesper-watchmate-mobile-app-broker/blob/master/resources/collision_prev_1.png?raw=true" alt="drawing" style="width:100px;"/>
 
 ![screenshot](https://github.com/jaffadog/vesper-watchmate-mobile-app-broker/blob/master/resources/collision_prev_1.png?raw=true =200x "screenshot")
 
