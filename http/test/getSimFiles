@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+<SimFiles>
+<simfile>TamakiStrait.sim</simfile>
+<simfile>TamakiStraitMOB.sim</simfile>
+<simfile>VirginIslands.sim</simfile>
+<simfile>AnchorWatch.sim</simfile>
+<simfile>stop</simfile>
+</SimFiles>
+<sim>stop</sim>
+</Watchmate>
