@@ -35,6 +35,7 @@ var aisDeviceModel = {
 
 
 
+
 // function getDeviceModelXml(aisDeviceModel) {
 // var deviceModelXml = {
 // Watchmate: [{
@@ -98,8 +99,8 @@ function getGpsModelAdvancedXml() {
 <Watchmate version='1.0' priority='0'>
 <GPSModel>
 <hasGPS>1</hasGPS>
-<latitudeText>N 39° 57.0674</latitudeText>
-<longitudeText>W 075° 08.3701</longitudeText>
+<latitudeText>N 39° 57.0689</latitudeText>
+<longitudeText>W 075° 08.3692</longitudeText>
 <COG>090</COG>
 <SOG>0.0</SOG>
 <HDGT></HDGT>
@@ -232,16 +233,20 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 </Watchmate>`
 }
 
+
+// <anchorLatitude>39.951</anchorLatitude>
+// <anchorLongitude>-75.14</anchorLongitude>
+
 function getAnchorWatchModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='1'>
 <AnchorWatch>
-<setAnchor>0</setAnchor>
+<setAnchor>1</setAnchor>
 <alarmRadius>30</alarmRadius>
-<magneticOrTrueBearing>True</magneticOrTrueBearing>
+<magneticOrTrueBearing>T</magneticOrTrueBearing>
 <alarmsEnabled>0</alarmsEnabled>
-<anchorLatitude>0</anchorLatitude>
-<anchorLongitude>0</anchorLongitude>
+<anchorLatitude>39.956</anchorLatitude>
+<anchorLongitude>-75.145</anchorLongitude>
 <outOfBounds>0</outOfBounds>
 <usingCorrected>0</usingCorrected>
 </AnchorWatch>
@@ -253,7 +258,7 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <Prefs>
 <PrefsRequested>
-{2,{\"accept.demo_mode\",\"\"},{\"profile.current\",\"\"}}
+{2,{"accept.demo_mode",""},{"profile.current",""}}
 </PrefsRequested>
 <Pref prefname='accept.demo_mode'>0</Pref>
 <Pref prefname='profile.current'>ANCHOR</Pref>
@@ -264,17 +269,30 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 function getAlarmsXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='1'>
-<Alarm MMSI='993672159' state='danger' type='guard'>
-<Name></Name>
-<COG></COG>
-<SOG></SOG>
-<CPA></CPA>
-<TCPA></TCPA>
-<Range>3.16</Range>
-<BearingTrue>177</BearingTrue>
-<TargetType></TargetType>
-</Alarm>
+ <Alarm MMSI='256850000' state='danger' type='guard'>
+ <Name></Name>
+ <COG></COG>
+ <SOG></SOG>
+ <CPA></CPA>
+ <TCPA></TCPA>
+ <Range>3.19</Range>
+ <BearingTrue>058</BearingTrue>
+ <TargetType></TargetType>
+ </Alarm>
 </Watchmate>`;
+
+// <Alarm MMSI='993672159' state='danger' type='guard'>
+// <Name></Name>
+// <COG></COG>
+// <SOG></SOG>
+// <CPA></CPA>
+// <TCPA></TCPA>
+// <Range>3.16</Range>
+// <BearingTrue>177</BearingTrue>
+// <TargetType></TargetType>
+// </Alarm>
+
+
 	
 // return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 // <Watchmate version='1.0' priority='1'>
@@ -580,25 +598,46 @@ function getTargetsXml() {
 	return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <Target>
-<MMSI>993672159</MMSI>
-<Name>14</Name>
-<CallSign></CallSign>
-<VesselTypeString>Beacon: Starboard hand</VesselTypeString>
-<VesselType>14</VesselType>
-<TargetType>4</TargetType>
-<Order>36862</Order>
+<MMSI>256850000</MMSI>
+<Name>ATLANTIC NAVIGATORII</Name>
+<CallSign>9HA4023</CallSign> 
+<VesselTypeString>Cargo</VesselTypeString>
+<VesselType>79</VesselType>
+<TargetType>1</TargetType>
+<Order>8190</Order>
 <TCPA></TCPA>
 <CPA></CPA>
-<Bearing>216</Bearing>
-<Range>28.2</Range>
-<COG2></COG2>
-<SOG></SOG>
-<DangerState></DangerState>
-<AlarmType></AlarmType>
+<Bearing>058</Bearing>
+<Range>3.19</Range>
+<COG2>257</COG2>
+<SOG>0.0</SOG>
+<DangerState>danger</DangerState>
+<AlarmType>guard</AlarmType>
 <FilteredState>show</FilteredState>
 </Target>
-</Watchmate>`
-	
+</Watchmate>`;
+
+// return `<?xml version='1.0' encoding='ISO-8859-1' ?>
+// <Watchmate version='1.0' priority='0'>
+// <Target>
+// <MMSI>993672159</MMSI>
+// <Name>14</Name>
+// <CallSign></CallSign>
+// <VesselTypeString>Beacon: Starboard hand</VesselTypeString>
+// <VesselType>14</VesselType>
+// <TargetType>4</TargetType>
+// <Order>36862</Order>
+// <TCPA></TCPA>
+// <CPA></CPA>
+// <Bearing>216</Bearing>
+// <Range>28.2</Range>
+// <COG2></COG2>
+// <SOG></SOG>
+// <DangerState></DangerState>
+// <AlarmType></AlarmType>
+// <FilteredState>show</FilteredState>
+// </Target>
+// </Watchmate>`
 	
 // return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 // <Watchmate version='1.0' priority='0'>
@@ -1220,25 +1259,27 @@ function getTargetDetails() {
 <Destination></Destination>
 <ETAText></ETAText>
 <NavStatus>15</NavStatus>
-<MMSI>993672159</MMSI>
-<Name>14</Name>
-<CallSign></CallSign>
-<VesselTypeString>Beacon: Starboard hand</VesselTypeString>
-<VesselType>14</VesselType>
-<TargetType>4</TargetType>
-<Order>36862</Order>
+<MMSI>256850000</MMSI>
+<Name>ATLANTIC NAVIGATORII</Name>
+<CallSign>9HA4023</CallSign> 
+<VesselTypeString>Cargo</VesselTypeString>
+<VesselType>79</VesselType>
+<TargetType>1</TargetType>
+<Order>8190</Order>
 <TCPA></TCPA>
 <CPA></CPA>
-<Bearing>216</Bearing>
-<Range>28.2</Range>
-<COG2></COG2>
-<SOG></SOG>
-<DangerState></DangerState>
-<AlarmType></AlarmType>
-<FilteredState>hide</FilteredState>
+<Bearing>058</Bearing>
+<Range>3.19</Range>
+<COG2>257</COG2>
+<SOG>0.0</SOG>
+<DangerState>danger</DangerState>
+<AlarmType>guard</AlarmType>
+<FilteredState>show</FilteredState>
 </Target>
 </Watchmate>`
 }
+
+
 
 // ======================= HTTP SERVER ========================
 // listens to requests from mobile app
@@ -1246,6 +1287,9 @@ function getTargetDetails() {
 // log all requests
 app.use(function(req, res, next) {
 	console.info(`${req.method} ${req.originalUrl}`);
+	// express.js automatically adds utf-8 encoding to everything. this
+	// overrides that. the app cannot deal with utf-8.
+	res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
 	next();
 });
 
@@ -1255,33 +1299,34 @@ app.get('/', (req, res) => res.send('Hello World!'));
 // GET /datamodel/getModel?*****
 app.get('/datamodel/getModel', (req, res) => {
 
-	console.log(req.query, (req.query["GPSModel.,Advanced"]===''));
+	console.log(req.query);
 
-	res.set('Content-Type', 'text/xml');
+	// res.set('Content-Type', 'text/xml; charset=US-ASCII');
+	// res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
 	
 	// GET /datamodel/getModel?DeviceModel
 	if (req.query.DeviceModel==='') {
-		res.send( getDeviceModelXml(aisDeviceModel) );
+		res.send( new Buffer(getDeviceModelXml(),'latin1') );
 	} 
 	
 	// GET /datamodel/getModel?GPSModel
 	else if (req.query.GPSModel==='') {
-		res.send( getGpsModelXml() );
+		res.send( new Buffer(getGpsModelXml(),'latin1') );
 	} 
 	
 	// GET /datamodel/getModel?GPSModel.,Advanced
 	else if (req.query["GPSModel.,Advanced"]==='') {
-		res.send( getGpsModelAdvancedXml() );
+		res.send( new Buffer(getGpsModelAdvancedXml(),'latin1') );
 	} 
 	
 	// GET /datamodel/getModel?TxStatus
 	else if (req.query.TxStatus==='') {
-		res.send( getTxStatusModelXml() );
+		res.send( new Buffer(getTxStatusModelXml(),'latin1') );
 	} 
 
 	// GET /datamodel/getModel?AnchorWatch
-	else if (req.query.TxStatus==='') {
-		res.send( getAnchorWatchModelXml() );
+	else if (req.query.AnchorWatch==='') {
+		res.send( new Buffer(getAnchorWatchModelXml(),'latin1') );
 	} 
 
 
@@ -1291,48 +1336,48 @@ app.get('/datamodel/getModel', (req, res) => {
 		var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
 			<Watchmate version='1.0' priority='0'>
 			</Watchmate>`; 
-		res.send(xml);
+		res.send( new Buffer(xml,'latin1') );
 	}
 
 });
 
 // GET /prefs/getPreferences?accept.demo_mode&profile.current
 app.get('/prefs/getPreferences', (req, res) => {
-	res.set('Content-Type', 'text/xml');
-	res.send(getPreferencesXml());
+	// res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
+	res.send( new Buffer(getPreferencesXml(),'latin1') );
 });
 
 // GET /alarms/get_current_list
 app.get('/alarms/get_current_list', (req, res) => {
-	res.set('Content-Type', 'text/xml');
-	res.send(getAlarmsXml());
+	// res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
+	res.send( new Buffer(getAlarmsXml(),'latin1') );
 });
 
 // GET /test/getSimFiles
 app.get('/test/getSimFiles', (req, res) => {
-	res.set('Content-Type', 'text/xml');
-	res.send(getSimsXml());
+	// res.set('Content-Type', 'text/xml');
+	res.send( new Buffer(getSimsXml(),'latin1') );
 });
 
 // GET /targets/getTargets
 app.get('/targets/getTargets', (req, res) => {
-	res.set('Content-Type', 'text/xml');
-	res.send(getTargetsXml());
+	// res.set('Content-Type', 'text/xml');
+	res.send( new Buffer(getTargetsXml(),'latin1') );
 });
 
 // GET /targets/getTargetDetails?MMSI=255805923
 app.get('/targets/getTargetDetails', (req, res) => {
-	res.set('Content-Type', 'text/xml');
-	res.send(getTargetDetails());
+	// res.set('Content-Type', 'text/xml');
+	res.send( new Buffer(getTargetDetails(),'latin1') );
 });
 
 // catchall
 app.get('*', function(req, res) {
-	res.set('Content-Type', 'text/xml');
+	// res.set('Content-Type', 'text/xml');
 	var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
 		<Watchmate version='1.0' priority='0'>
 		</Watchmate>`; 
-	res.send(xml);
+	res.send( new Buffer(xml,'latin1') );
 });
 
 app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort}!`))
@@ -1340,61 +1385,78 @@ app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort
 // ======================= TCP SERVER ========================
 // listens to requests from mobile app
 
-var tcpServer = net.createServer(function(socket) {
-	// socket.write('Echo server\r\n');
-	// socket.pipe(socket);
+var tcpServer = net.createServer();
+
+tcpServer.listen(tcpPort);
+console.log('TCP Server listening on ' + tcpServer.address().address +':'+ tcpServer.address().port);
+
+tcpServer.on('connection', function(socket) {
+    console.log('New TCP Server Connection: ' + socket.remoteAddress +':'+ socket.remotePort);
+
+    // $GPRMC = Recommended minimum specific GPS/Transit data
+    // $GPVTG = Track Made Good and Ground Speed
+    // $GPGGA = Global Positioning System Fix Data
+    // $GPGSA = GPS DOP and active satellites
+    // $GPGSV = GPS Satellites in view
+    // $GPGLL = Geographic Position, Latitude / Longitude and time
+
+    // the app wants to see traffic on port 39150. if it does not, it will
+    // periodically reinitialize. i guess this is a mechanism to try and restore
+    // what it perceives as lost connectivity with the AIS unit. The app does
+    // not actually appear to use this data though - instead relying on getting
+    // everything it needs from the web interfaces.
+    var timerId = setInterval(function(){
+ var data =
+ `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+ $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+ $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+ $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+ $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+ $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+ $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
+ socket.write(data);
+ }, 4000);
+
+    // socket.write('Echo server');
+    // socket.pipe(socket);
 
     socket.on('data', function(data) {
-      var string = (data.toString());
-      console.log('TCP Server Received:' + string)
+        var string = (data.toString());
+        console.log('TCP Server Received:' + string)
 
-//		var data = `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-//			$GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-//			$GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-//			$GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-//			$GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-//			$GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-//			$GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
-//		socket.write(data);
+        // var data =
+        // `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+        // $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+        // $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+        // $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+        // $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+        // $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+        // $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
+        // socket.write(data);
 
     });
 
-	socket.on('end', () => {
-    	console.log('TCP Server: client disconnected');
-  	});
+    socket.on('end', () => {
+	clearInterval(timerId);
+	console.log('TCP Server: client disconnected' + socket.remoteAddress +':'+ socket.remotePort);
+    });
 
-//	setInterval(function(){
-//		var data = `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-//			$GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-//			$GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-//			$GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-//			$GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-//			$GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-//			$GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
-//		socket.write(data);
-//		}, 4000);
   
 });
 
-tcpServer.listen(tcpPort);
 
 // ======================= TCP CLIENT ========================
 // gets data from AIS
 
-/* 
-var client = new net.Socket();
-
-client.connect(iasPort, aisHostname, function() {
-	console.log('TCP Client Connected');
-	client.write('Hello, server! Love, Client.');
-});
-
-client.on('data', function(data) {
-	console.log('TCP Client Received: ' + data);
-	client.destroy(); // kill client after server's response
-});
-
-client.on('close', function() {
-	console.log('TCP Client: Connection closed');
-});
+/*
+ * var client = new net.Socket();
+ * 
+ * client.connect(iasPort, aisHostname, function() { console.log('TCP Client
+ * Connected'); client.write('Hello, server! Love, Client.'); });
+ * 
+ * client.on('data', function(data) { console.log('TCP Client Received: ' +
+ * data); client.destroy(); // kill client after server's response });
+ * 
+ * client.on('close', function() { console.log('TCP Client: Connection closed');
+ * });
  */
