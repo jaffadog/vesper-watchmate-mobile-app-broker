@@ -1482,6 +1482,9 @@ var NmeaDecode = require ("ggencoder").NmeaDecode;
 
 let client = new net.Socket()
 
+// FIXME:
+client.setEncoding('latin1');
+
 function connect() {
     console.log("new client");
     
