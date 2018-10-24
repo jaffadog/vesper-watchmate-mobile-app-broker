@@ -1,3 +1,5 @@
+"use strict";
+
 const express = require('express')
 const app = express()
 
@@ -80,11 +82,16 @@ function getDeviceModelXml() {
 }
 
 var gpsModel = {
-    latitudeText: 'N 39° 57.0689',
-    longitudeText: 'W 075° 08.3692',
-    COG: '090',
+    latitudeText: 'N 00° 00.0000',
+    longitudeText: 'E 000° 00.0000',
+    COG: '000',
     SOG: '0.0'
 };
+
+// FIXME: check if we can use hasGPS=0 while there is no fix
+// so that we don't send any other gps data until we have a fix
+
+// FIXME: age out old GPS fix data - i.e. older that 5 minutes and revert back to hasGPS=0 (no fix)
 
 function getGpsModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
@@ -1620,46 +1627,43 @@ function connect() {
 
         	if (decMsg.shipname !== undefined) {
         	    target.Name = decMsg.shipname;
-//        	    targets[decMsg.mmsi].Name = decMsg.shipname;
         	}
         	
         	if (decMsg.lat !== undefined) {
+        	    target.lat = decMsg.lat;
+        	    target.lon = decMsg.lon;
         	    target.latitudeText = formatLat(decMsg.lat);
-//        	    targets[decMsg.mmsi].latitudeText = formatLat(decMsg.lat);
+        	    target.longitudeText = formatLon(decMsg.lon);
         	}
         	
-        	if (decMsg.lon !== undefined) {
-        	    target.longitudeText = formatLon(decMsg.lon);
-//        	    targets[decMsg.mmsi].longitudeText = formatLon(decMsg.lon);
-        	}
-
         	if (decMsg.cog !== undefined) {
         	    target.COG2 = ('00' + Math.round(decMsg.cog)).slice(-3);
-//        	    targets[decMsg.mmsi].COG2 = ('00' + Math.round(decMsg.cog)).slice(-3);
         	}
 
         	if (decMsg.sog !== undefined) {
         	    target.SOG = decMsg.sog.toFixed(1);
-//        	    targets[decMsg.mmsi].SOG = decMsg.sog.toFixed(1);
         	}
 
         	if (decMsg.cargo !== undefined) {
         	    target.VesselType = decMsg.cargo;
         	    target.VesselTypeString = decMsg.GetVesselType();
-//        	    targets[decMsg.mmsi].VesselType = decMsg.cargo;
-//        	    targets[decMsg.mmsi].VesselTypeString = decMsg.GetVesselType();
         	}
+		    
+		// FIXME: add NAV_STATUS. decMsg.GetNavStatus()
+		//     0:  "Under way using engine",
+		//     1:  "At anchor"  
+		    
+		// FIXME: add MSG_TYPE. decMsg.Getaistype()... probably not too interesting
+		//     1:  "Position Report Class A",
+		//    14:  "Safety Related Broadcast Message",
         	
         	targets[decMsg.mmsi] = target;
 
         	console.log('target',target);
-
         	console.log('targets',targets);
-
 
             }
 
-            
         }
         
         // decode NMEA message
@@ -1688,21 +1692,22 @@ function connect() {
             // COG: '090',
             // SOG: '0.0'
             // };
+		
+	    // FIXME: add GPS accuracy and satellite data
 
             if (decMsg.valid) {
-        	if (decMsg.lat) {
+        	if (decMsg.lat !== undefined) {
+        	    gpsModel.lat = decMsg.lat;
+        	    gpsModel.lon = decMsg.lon;
         	    gpsModel.latitudeText = formatLat(decMsg.lat);
-        	}
-        	
-        	if (decMsg.lon) {
         	    gpsModel.longitudeText = formatLon(decMsg.lon);
         	}
-
-        	if (decMsg.cog) {
+        	
+        	if (decMsg.cog !== undefined) {
         	    gpsModel.COG = ('00' + Math.round(decMsg.cog)).slice(-3);
         	}
 
-        	if (decMsg.sog) {
+        	if (decMsg.sog !== undefined) {
         	    gpsModel.SOG = decMsg.sog.toFixed(1);
         	}
 
@@ -1739,6 +1744,8 @@ reconnect = () => {
 
 connect()
 
+// FIXME: need to zero pad minutes to 2 characters
+
 // latitudeText: 'N 39° 57.0689',
 function formatLat(dec) {
     var decAbs = Math.abs(dec);
@@ -1754,7 +1761,3 @@ function formatLon(dec) {
     var min = ((decAbs - deg) * 60).toFixed(4);
     return (dec > 0 ? "E" : "W") + " " + deg + "° " + min;
 }
-
-
-
-
