@@ -5,6 +5,8 @@
   "main": "app.js",
   "dependencies": {
     "express": "^4.16.4",
+    "ggencoder": "^1.0.2",
+    "net-retry-connect": "^0.1.1",
     "xml": "^1.0.1"
   },
   "devDependencies": {},
