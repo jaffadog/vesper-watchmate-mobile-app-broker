@@ -1,3 +1,5 @@
+"use strict";
+
 const express = require('express')
 const app = express()
 
@@ -80,11 +82,16 @@ function getDeviceModelXml() {
 }
 
 var gpsModel = {
-    latitudeText: 'N 39° 57.0689',
-    longitudeText: 'W 075° 08.3692',
-    COG: '090',
+    latitudeText: 'N 00° 00.0000',
+    longitudeText: 'E 000° 00.0000',
+    COG: '000',
     SOG: '0.0'
 };
+
+// FIXME: check if we can use hasGPS=0 while there is no fix
+// so that we don't send any other gps data until we have a fix
+
+// FIXME: age out old GPS fix data - i.e. older that 5 minutes and revert back to hasGPS=0 (no fix)
 
 function getGpsModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
@@ -611,27 +618,36 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 }
 
 function getTargetsXml() {
-	return `<?xml version='1.0' encoding='ISO-8859-1' ?>
-<Watchmate version='1.0' priority='0'>
-<Target>
-<MMSI>256850000</MMSI>
-<Name>ATLANTIC NAVIGATORII</Name>
-<CallSign>9HA4023</CallSign> 
-<VesselTypeString>Cargo</VesselTypeString>
-<VesselType>79</VesselType>
+	var targetsXml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>`;	
+	
+	for (var target in targets) {
+  		targetsXml += `<Target>
+<MMSI>${target.MMSI}</MMSI>
+<Name>${target.Name}</Name>
+<CallSign></CallSign> 
+<VesselTypeString>${target.VesselTypeString}</VesselTypeString>
+<VesselType>${target.VesselType}</VesselType>
 <TargetType>1</TargetType>
 <Order>8190</Order>
 <TCPA></TCPA>
 <CPA></CPA>
 <Bearing>058</Bearing>
 <Range>3.19</Range>
-<COG2>257</COG2>
-<SOG>0.0</SOG>
+<COG2>${target.COG2}</COG2>
+<SOG>${target.SOG}</SOG>
 <DangerState>danger</DangerState>
 <AlarmType>guard</AlarmType>
 <FilteredState>show</FilteredState>
-</Target>
-</Watchmate>`;
+</Target>`;
+		
+		// DangerState: danger, ???
+		// AlarmType: guard, ????
+		// FilteredState: show, hide
+	}
+	
+	targetsXml += '</Watchmate>';
+	return targetsXml;
 
 // return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 // <Watchmate version='1.0' priority='0'>
@@ -1269,7 +1285,13 @@ var target = {
 };
 
 
-function getTargetDetails() {
+function getTargetDetails(mmsi) {
+	var target = targets[mmsi];
+	
+	if (target === undefined) {
+		return;
+	}
+	
 	return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <Target>
@@ -1278,8 +1300,8 @@ function getTargetDetails() {
 <HDG></HDG>
 <ROT></ROT>
 <Altitude>-1</Altitude>
-<LatitudeText>N 39° 34.2617</LatitudeText>
-<LongitudeText>W 075° 29.8876</LongitudeText>
+<LatitudeText>${target.latitudeText}</LatitudeText>
+<LongitudeText>${target.longitudeText}</LongitudeText>
 <OffPosition>0</OffPosition>
 <Virtual>1</Virtual>
 <Dimensions>---</Dimensions>
@@ -1288,27 +1310,25 @@ function getTargetDetails() {
 <Destination></Destination>
 <ETAText></ETAText>
 <NavStatus>15</NavStatus>
-<MMSI>256850000</MMSI>
-<Name>ATLANTIC NAVIGATORII</Name>
-<CallSign>9HA4023</CallSign> 
-<VesselTypeString>Cargo</VesselTypeString>
-<VesselType>79</VesselType>
+<MMSI>${mmsi}</MMSI>
+<Name>${target.Name}</Name>
+<CallSign></CallSign> 
+<VesselTypeString>${target.VesselTypeString}</VesselTypeString>
+<VesselType>${target.VesselType}</VesselType>
 <TargetType>1</TargetType>
 <Order>8190</Order>
 <TCPA></TCPA>
 <CPA></CPA>
 <Bearing>058</Bearing>
 <Range>3.19</Range>
-<COG2>257</COG2>
-<SOG>0.0</SOG>
+<COG2>${target.COG2}</COG2>
+<SOG>${target.SOG}</SOG>
 <DangerState>danger</DangerState>
 <AlarmType>guard</AlarmType>
 <FilteredState>show</FilteredState>
 </Target>
 </Watchmate>`
 }
-
-
 
 // ======================= HTTP SERVER ========================
 // listens to requests from mobile app
@@ -1317,7 +1337,7 @@ function getTargetDetails() {
 app.use(function(req, res, next) {
 	console.info(`${req.method} ${req.originalUrl}`);
 	// express.js automatically adds utf-8 encoding to everything. this
-	// overrides that. the app cannot deal with utf-8.
+	// overrides that. the watchmate mobile app cannot deal with utf-8.
 	res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
 	next();
 });
@@ -1596,10 +1616,10 @@ function connect() {
             //
             // }
             
-
             if (decMsg.valid && decMsg.mmsi) {
         	
         	var target = targets[decMsg.mmsi];
+		target.MMSI = decMsg.mmsi;
         	
         	console.log('target',target);
         	
@@ -1623,46 +1643,43 @@ function connect() {
 
         	if (decMsg.shipname !== undefined) {
         	    target.Name = decMsg.shipname;
-//        	    targets[decMsg.mmsi].Name = decMsg.shipname;
         	}
         	
         	if (decMsg.lat !== undefined) {
+        	    target.lat = decMsg.lat;
+        	    target.lon = decMsg.lon;
         	    target.latitudeText = formatLat(decMsg.lat);
-//        	    targets[decMsg.mmsi].latitudeText = formatLat(decMsg.lat);
+        	    target.longitudeText = formatLon(decMsg.lon);
         	}
         	
-        	if (decMsg.lon !== undefined) {
-        	    target.longitudeText = formatLon(decMsg.lon);
-//        	    targets[decMsg.mmsi].longitudeText = formatLon(decMsg.lon);
-        	}
-
         	if (decMsg.cog !== undefined) {
         	    target.COG2 = ('00' + Math.round(decMsg.cog)).slice(-3);
-//        	    targets[decMsg.mmsi].COG2 = ('00' + Math.round(decMsg.cog)).slice(-3);
         	}
 
         	if (decMsg.sog !== undefined) {
         	    target.SOG = decMsg.sog.toFixed(1);
-//        	    targets[decMsg.mmsi].SOG = decMsg.sog.toFixed(1);
         	}
 
         	if (decMsg.cargo !== undefined) {
         	    target.VesselType = decMsg.cargo;
         	    target.VesselTypeString = decMsg.GetVesselType();
-//        	    targets[decMsg.mmsi].VesselType = decMsg.cargo;
-//        	    targets[decMsg.mmsi].VesselTypeString = decMsg.GetVesselType();
         	}
+		    
+		// FIXME: add NAV_STATUS. decMsg.GetNavStatus()
+		//     0:  "Under way using engine",
+		//     1:  "At anchor"  
+		    
+		// FIXME: add MSG_TYPE. decMsg.Getaistype()... probably not too interesting
+		//     1:  "Position Report Class A",
+		//    14:  "Safety Related Broadcast Message",
         	
         	targets[decMsg.mmsi] = target;
 
         	console.log('target',target);
-
         	console.log('targets',targets);
-
 
             }
 
-            
         }
         
         // decode NMEA message
@@ -1691,21 +1708,24 @@ function connect() {
             // COG: '090',
             // SOG: '0.0'
             // };
+		
+	    // FIXME: add GPS accuracy and satellite data
+		
+	    // FIXME: add magvar
 
             if (decMsg.valid) {
-        	if (decMsg.lat) {
+        	if (decMsg.lat !== undefined) {
+        	    gpsModel.lat = decMsg.lat;
+        	    gpsModel.lon = decMsg.lon;
         	    gpsModel.latitudeText = formatLat(decMsg.lat);
-        	}
-        	
-        	if (decMsg.lon) {
         	    gpsModel.longitudeText = formatLon(decMsg.lon);
         	}
-
-        	if (decMsg.cog) {
+        	
+        	if (decMsg.cog !== undefined) {
         	    gpsModel.COG = ('00' + Math.round(decMsg.cog)).slice(-3);
         	}
 
-        	if (decMsg.sog) {
+        	if (decMsg.sog !== undefined) {
         	    gpsModel.SOG = decMsg.sog.toFixed(1);
         	}
 
@@ -1742,6 +1762,8 @@ reconnect = () => {
 
 connect()
 
+// FIXME: need to zero pad minutes to 2 characters
+
 // latitudeText: 'N 39° 57.0689',
 function formatLat(dec) {
     var decAbs = Math.abs(dec);
@@ -1757,7 +1779,3 @@ function formatLon(dec) {
     var min = ((decAbs - deg) * 60).toFixed(4);
     return (dec > 0 ? "E" : "W") + " " + deg + "° " + min;
 }
-
-
-
-
