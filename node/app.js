@@ -618,27 +618,36 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 }
 
 function getTargetsXml() {
-	return `<?xml version='1.0' encoding='ISO-8859-1' ?>
-<Watchmate version='1.0' priority='0'>
-<Target>
-<MMSI>256850000</MMSI>
-<Name>ATLANTIC NAVIGATORII</Name>
-<CallSign>9HA4023</CallSign> 
-<VesselTypeString>Cargo</VesselTypeString>
-<VesselType>79</VesselType>
+	var targetsXml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>`;	
+	
+	for (var target in targets) {
+  		targetsXml += `<Target>
+<MMSI>${target.MMSI}</MMSI>
+<Name>${target.Name}</Name>
+<CallSign></CallSign> 
+<VesselTypeString>${target.VesselTypeString}</VesselTypeString>
+<VesselType>${target.VesselType}</VesselType>
 <TargetType>1</TargetType>
 <Order>8190</Order>
 <TCPA></TCPA>
 <CPA></CPA>
 <Bearing>058</Bearing>
 <Range>3.19</Range>
-<COG2>257</COG2>
-<SOG>0.0</SOG>
+<COG2>${target.COG2}</COG2>
+<SOG>${target.SOG}</SOG>
 <DangerState>danger</DangerState>
 <AlarmType>guard</AlarmType>
 <FilteredState>show</FilteredState>
-</Target>
-</Watchmate>`;
+</Target>`;
+		
+		// DangerState: danger, ???
+		// AlarmType: guard, ????
+		// FilteredState: show, hide
+	}
+	
+	targetsXml += '</Watchmate>';
+	return targetsXml;
 
 // return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 // <Watchmate version='1.0' priority='0'>
@@ -1276,7 +1285,13 @@ var target = {
 };
 
 
-function getTargetDetails() {
+function getTargetDetails(mmsi) {
+	var target = targets[mmsi];
+	
+	if (target === undefined) {
+		return;
+	}
+	
 	return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <Target>
@@ -1285,8 +1300,8 @@ function getTargetDetails() {
 <HDG></HDG>
 <ROT></ROT>
 <Altitude>-1</Altitude>
-<LatitudeText>N 39° 34.2617</LatitudeText>
-<LongitudeText>W 075° 29.8876</LongitudeText>
+<LatitudeText>${target.latitudeText}</LatitudeText>
+<LongitudeText>${target.longitudeText}</LongitudeText>
 <OffPosition>0</OffPosition>
 <Virtual>1</Virtual>
 <Dimensions>---</Dimensions>
@@ -1295,27 +1310,25 @@ function getTargetDetails() {
 <Destination></Destination>
 <ETAText></ETAText>
 <NavStatus>15</NavStatus>
-<MMSI>256850000</MMSI>
-<Name>ATLANTIC NAVIGATORII</Name>
-<CallSign>9HA4023</CallSign> 
-<VesselTypeString>Cargo</VesselTypeString>
-<VesselType>79</VesselType>
+<MMSI>${mmsi}</MMSI>
+<Name>${target.Name}</Name>
+<CallSign></CallSign> 
+<VesselTypeString>${target.VesselTypeString}</VesselTypeString>
+<VesselType>${target.VesselType}</VesselType>
 <TargetType>1</TargetType>
 <Order>8190</Order>
 <TCPA></TCPA>
 <CPA></CPA>
 <Bearing>058</Bearing>
 <Range>3.19</Range>
-<COG2>257</COG2>
-<SOG>0.0</SOG>
+<COG2>${target.COG2}</COG2>
+<SOG>${target.SOG}</SOG>
 <DangerState>danger</DangerState>
 <AlarmType>guard</AlarmType>
 <FilteredState>show</FilteredState>
 </Target>
 </Watchmate>`
 }
-
-
 
 // ======================= HTTP SERVER ========================
 // listens to requests from mobile app
@@ -1324,7 +1337,7 @@ function getTargetDetails() {
 app.use(function(req, res, next) {
 	console.info(`${req.method} ${req.originalUrl}`);
 	// express.js automatically adds utf-8 encoding to everything. this
-	// overrides that. the app cannot deal with utf-8.
+	// overrides that. the watchmate mobile app cannot deal with utf-8.
 	res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
 	next();
 });
@@ -1600,10 +1613,10 @@ function connect() {
             //
             // }
             
-
             if (decMsg.valid && decMsg.mmsi) {
         	
         	var target = targets[decMsg.mmsi];
+		target.MMSI = decMsg.mmsi;
         	
         	console.log('target',target);
         	
@@ -1694,6 +1707,8 @@ function connect() {
             // };
 		
 	    // FIXME: add GPS accuracy and satellite data
+		
+	    // FIXME: add magvar
 
             if (decMsg.valid) {
         	if (decMsg.lat !== undefined) {
