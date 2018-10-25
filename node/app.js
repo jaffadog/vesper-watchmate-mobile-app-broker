@@ -3,8 +3,13 @@
 const express = require('express')
 const app = express()
 
-var net = require('net');
-var xml = require('xml');
+const net = require('net');
+const xml = require('xml');
+const AisDecode  = require ("ggencoder").AisDecode;
+const NmeaDecode = require ("ggencoder").NmeaDecode;
+const geolib = require('geolib');
+const x = require('lethexa-motionpredict');
+const Magvar = require('magvar');
 
 const tcpPort = 39150;
 const httpPort = 39151;
@@ -13,6 +18,7 @@ const aisHostname = '127.0.0.1';
 const iasPort = 3000;
 
 var targets = {};
+var aisSession = {};
 
 var aisDeviceModel = {
 	connectedDeviceType: 'XB-8000',
@@ -91,19 +97,20 @@ var gpsModel = {
 // FIXME: check if we can use hasGPS=0 while there is no fix
 // so that we don't send any other gps data until we have a fix
 
-// FIXME: age out old GPS fix data - i.e. older that 5 minutes and revert back to hasGPS=0 (no fix)
+// FIXME: age out old GPS fix data - i.e. older that 5 minutes and revert back
+// to hasGPS=0 (no fix)
 
 function getGpsModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <GPSModel>
 <hasGPS>1</hasGPS>
-<latitudeText>${gpsModel.latitudeText}</latitudeText>
-<longitudeText>${gpsModel.longitudeText}</longitudeText>
-<COG>${gpsModel.COG}</COG>
-<SOG>${gpsModel.SOG}</SOG>
+<latitudeText>${gpsModel.latitudeText||''}</latitudeText>
+<longitudeText>${gpsModel.longitudeText||''}</longitudeText>
+<COG>${gpsModel.COG||''}</COG>
+<SOG>${gpsModel.SOG||''}</SOG>
 <HDGT></HDGT>
-<magvar>-12.11</magvar>
+<magvar>${gpsModel.magvar||''}</magvar>
 <hasBowPosition>0</hasBowPosition>
 <sim>stop</sim>
 </GPSModel>
@@ -122,12 +129,12 @@ function getGpsModelAdvancedXml() {
 <Watchmate version='1.0' priority='0'>
 <GPSModel>
 <hasGPS>1</hasGPS>
-<latitudeText>${gpsModel.latitudeText}</latitudeText>
-<longitudeText>${gpsModel.longitudeText}</longitudeText>
-<COG>${gpsModel.COG}</COG>
-<SOG>${gpsModel.SOG}</SOG>
+<latitudeText>${gpsModel.latitudeText||''}</latitudeText>
+<longitudeText>${gpsModel.longitudeText||''}</longitudeText>
+<COG>${gpsModel.COG||''}</COG>
+<SOG>${gpsModel.SOG||''}</SOG>
 <HDGT></HDGT>
-<magvar>-12.11</magvar>
+<magvar>${gpsModel.magvar||''}</magvar>
 <hasBowPosition>0</hasBowPosition>
 <sim>stop</sim>
 <Fix>
@@ -292,17 +299,21 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 function getAlarmsXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='1'>
- <Alarm MMSI='256850000' state='danger' type='guard'>
- <Name></Name>
- <COG></COG>
- <SOG></SOG>
- <CPA></CPA>
- <TCPA></TCPA>
- <Range>3.19</Range>
- <BearingTrue>058</BearingTrue>
- <TargetType></TargetType>
- </Alarm>
 </Watchmate>`;
+
+// <?xml version='1.0' encoding='ISO-8859-1' ?>
+// <Watchmate version='1.0' priority='1'>
+// <Alarm MMSI='256850000' state='danger' type='guard'>
+// <Name></Name>
+// <COG></COG>
+// <SOG></SOG>
+// <CPA></CPA>
+// <TCPA></TCPA>
+// <Range>3.19</Range>
+// <BearingTrue>058</BearingTrue>
+// <TargetType></TargetType>
+// </Alarm>
+// </Watchmate>
 
 // <Alarm MMSI='993672159' state='danger' type='guard'>
 // <Name></Name>
@@ -618,36 +629,43 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 }
 
 function getTargetsXml() {
-	var targetsXml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
+    var response = 
+`<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>`;	
-	
-	for (var target in targets) {
-  		targetsXml += `<Target>
+
+    console.log('targets',targets);
+    
+    for (var mmsi in targets) {
+	var target = targets[mmsi];
+	console.log('target',target);
+	response += 
+`<Target>
 <MMSI>${target.MMSI}</MMSI>
-<Name>${target.Name}</Name>
+<Name>${target.Name||''}</Name>
 <CallSign></CallSign> 
-<VesselTypeString>${target.VesselTypeString}</VesselTypeString>
-<VesselType>${target.VesselType}</VesselType>
+<VesselTypeString>${target.VesselTypeString||''}</VesselTypeString>
+<VesselType>${target.VesselType||''}</VesselType>
 <TargetType>1</TargetType>
 <Order>8190</Order>
 <TCPA></TCPA>
 <CPA></CPA>
-<Bearing>058</Bearing>
-<Range>3.19</Range>
-<COG2>${target.COG2}</COG2>
-<SOG>${target.SOG}</SOG>
+<Bearing>${target.Bearing||''}</Bearing>
+<Range>${target.Range||''}</Range>
+<COG2>${target.COG2||''}</COG2>
+<SOG>${target.SOG||''}</SOG>
 <DangerState>danger</DangerState>
 <AlarmType>guard</AlarmType>
 <FilteredState>show</FilteredState>
 </Target>`;
 		
-		// DangerState: danger, ???
-		// AlarmType: guard, ????
-		// FilteredState: show, hide
-	}
-	
-	targetsXml += '</Watchmate>';
-	return targetsXml;
+	// warning danger guard
+	// DangerState: danger, ???
+	// AlarmType: guard, ????
+	// FilteredState: show, hide
+    }
+
+    response += '</Watchmate>';
+    return response;
 
 // return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 // <Watchmate version='1.0' priority='0'>
@@ -1272,36 +1290,36 @@ function getTargetsXml() {
 // </Watchmate>`
 }
 
-var target = {
-	MMSI: '256850000',
-	Name: 'ATLANTIC NAVIGATORII',
-        latitudeText: 'N 39° 57.0689',
-        longitudeText: 'W 075° 08.3692',
-        COG2: '090',
-        SOG: '0.0',
-        VesselTypeString: '',
-        VesselType: '',
-        TargetType: '',
-};
+// var target = {
+// MMSI: '256850000',
+// Name: 'ATLANTIC NAVIGATORII',
+// latitudeText: 'N 39° 57.0689',
+// longitudeText: 'W 075° 08.3692',
+// COG2: '090',
+// SOG: '0.0',
+// VesselTypeString: '',
+// VesselType: '',
+// TargetType: '',
+// };
 
 
 function getTargetDetails(mmsi) {
-	var target = targets[mmsi];
-	
-	if (target === undefined) {
-		return;
-	}
-	
-	return `<?xml version='1.0' encoding='ISO-8859-1' ?>
-<Watchmate version='1.0' priority='0'>
-<Target>
+    var response = 
+`<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>`;	
+
+    var target = targets[mmsi];
+
+    if (target !== undefined) {
+	response += 
+`<Target>
 <IMO>0</IMO>
-<COG></COG>
+<COG>${target.COG2||''}</COG>
 <HDG></HDG>
 <ROT></ROT>
 <Altitude>-1</Altitude>
-<LatitudeText>${target.latitudeText}</LatitudeText>
-<LongitudeText>${target.longitudeText}</LongitudeText>
+<LatitudeText>${target.latitudeText||''}</LatitudeText>
+<LongitudeText>${target.longitudeText||''}</LongitudeText>
 <OffPosition>0</OffPosition>
 <Virtual>1</Virtual>
 <Dimensions>---</Dimensions>
@@ -1310,24 +1328,34 @@ function getTargetDetails(mmsi) {
 <Destination></Destination>
 <ETAText></ETAText>
 <NavStatus>15</NavStatus>
-<MMSI>${mmsi}</MMSI>
-<Name>${target.Name}</Name>
+<MMSI>${mmsi||''}</MMSI>
+<Name>${target.Name||''}</Name>
 <CallSign></CallSign> 
-<VesselTypeString>${target.VesselTypeString}</VesselTypeString>
-<VesselType>${target.VesselType}</VesselType>
+<VesselTypeString>${target.VesselTypeString||''}</VesselTypeString>
+<VesselType>${target.VesselType||''}</VesselType>
 <TargetType>1</TargetType>
 <Order>8190</Order>
 <TCPA></TCPA>
 <CPA></CPA>
-<Bearing>058</Bearing>
-<Range>3.19</Range>
-<COG2>${target.COG2}</COG2>
-<SOG>${target.SOG}</SOG>
+<Bearing>${target.Bearing||''}</Bearing>
+<Range>${target.Range||''}</Range>
+<COG2>${target.COG2||''}</COG2>
+<SOG>${target.SOG||''}</SOG>
 <DangerState>danger</DangerState>
 <AlarmType>guard</AlarmType>
 <FilteredState>show</FilteredState>
-</Target>
-</Watchmate>`
+</Target>`
+
+	//    <COG>${target.COG2||''}</COG>
+	//    <HDG>30</HDG>
+
+	// DangerState: danger, ???
+	// AlarmType: guard, ????
+	// FilteredState: show, hide
+    }
+
+    response += '</Watchmate>';
+    return response;
 }
 
 // ======================= HTTP SERVER ========================
@@ -1338,7 +1366,7 @@ app.use(function(req, res, next) {
 	console.info(`${req.method} ${req.originalUrl}`);
 	// express.js automatically adds utf-8 encoding to everything. this
 	// overrides that. the watchmate mobile app cannot deal with utf-8.
-	res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
+	res.setHeader('Content-Type', 'text/xml; charset=ISO-8859-1');
 	next();
 });
 
@@ -1348,85 +1376,78 @@ app.get('/', (req, res) => res.send('Hello World!'));
 // GET /datamodel/getModel?*****
 app.get('/datamodel/getModel', (req, res) => {
 
-	console.log(req.query);
-
-	// res.set('Content-Type', 'text/xml; charset=US-ASCII');
-	// res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
-	
-	// GET /datamodel/getModel?DeviceModel
-	if (req.query.DeviceModel==='') {
-		res.send( new Buffer(getDeviceModelXml(),'latin1') );
-	} 
-	
-	// GET /datamodel/getModel?GPSModel
-	else if (req.query.GPSModel==='') {
-		res.send( new Buffer(getGpsModelXml(),'latin1') );
-	} 
-	
-	// GET /datamodel/getModel?GPSModel.,Advanced
-	else if (req.query["GPSModel.,Advanced"]==='') {
-		res.send( new Buffer(getGpsModelAdvancedXml(),'latin1') );
-	} 
-	
-	// GET /datamodel/getModel?TxStatus
-	else if (req.query.TxStatus==='') {
-		res.send( new Buffer(getTxStatusModelXml(),'latin1') );
-	} 
-
-	// GET /datamodel/getModel?AnchorWatch
-	else if (req.query.AnchorWatch==='') {
-		res.send( new Buffer(getAnchorWatchModelXml(),'latin1') );
-	} 
-
-
-	// 404
-	else {
-		res.set('Content-Type', 'text/xml');
-		var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
-			<Watchmate version='1.0' priority='0'>
-			</Watchmate>`; 
-		res.send( new Buffer(xml,'latin1') );
-	}
+    console.log(req.query);
+    
+    // GET /datamodel/getModel?DeviceModel
+    if (req.query.DeviceModel==='') {
+    	res.send( new Buffer(getDeviceModelXml(),'latin1') );
+    } 
+    
+    // GET /datamodel/getModel?GPSModel
+    else if (req.query.GPSModel==='') {
+    	res.send( new Buffer(getGpsModelXml(),'latin1') );
+    } 
+    
+    // GET /datamodel/getModel?GPSModel.,Advanced
+    else if (req.query["GPSModel.,Advanced"]==='') {
+    	res.send( new Buffer(getGpsModelAdvancedXml(),'latin1') );
+    } 
+    
+    // GET /datamodel/getModel?TxStatus
+    else if (req.query.TxStatus==='') {
+    	res.send( new Buffer(getTxStatusModelXml(),'latin1') );
+    } 
+    
+    // GET /datamodel/getModel?AnchorWatch
+    else if (req.query.AnchorWatch==='') {
+    	res.send( new Buffer(getAnchorWatchModelXml(),'latin1') );
+    } 
+    
+    
+    // 404
+    else {
+    	res.set('Content-Type', 'text/xml');
+    	var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
+    		<Watchmate version='1.0' priority='0'>
+    		</Watchmate>`; 
+    	res.send( new Buffer(xml,'latin1') );
+    }
 
 });
 
 // GET /prefs/getPreferences?accept.demo_mode&profile.current
 app.get('/prefs/getPreferences', (req, res) => {
-	// res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
-	res.send( new Buffer(getPreferencesXml(),'latin1') );
+    res.send( new Buffer(getPreferencesXml(),'latin1') );
 });
 
 // GET /alarms/get_current_list
 app.get('/alarms/get_current_list', (req, res) => {
-	// res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
-	res.send( new Buffer(getAlarmsXml(),'latin1') );
+    res.send( new Buffer(getAlarmsXml(),'latin1') );
 });
 
 // GET /test/getSimFiles
 app.get('/test/getSimFiles', (req, res) => {
-	// res.set('Content-Type', 'text/xml');
-	res.send( new Buffer(getSimsXml(),'latin1') );
+    res.send( new Buffer(getSimsXml(),'latin1') );
 });
 
 // GET /targets/getTargets
 app.get('/targets/getTargets', (req, res) => {
-	// res.set('Content-Type', 'text/xml');
-	res.send( new Buffer(getTargetsXml(),'latin1') );
+    res.send( new Buffer(getTargetsXml(),'latin1') );
 });
 
 // GET /targets/getTargetDetails?MMSI=255805923
 app.get('/targets/getTargetDetails', (req, res) => {
-	// res.set('Content-Type', 'text/xml');
-	res.send( new Buffer(getTargetDetails(),'latin1') );
+    var mmsi = req.query.MMSI;
+    res.send( new Buffer(getTargetDetails(mmsi),'latin1') );
 });
 
 // catchall
 app.get('*', function(req, res) {
-	// res.set('Content-Type', 'text/xml');
-	var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
-		<Watchmate version='1.0' priority='0'>
-		</Watchmate>`; 
-	res.send( new Buffer(xml,'latin1') );
+    // res.set('Content-Type', 'text/xml');
+    var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
+    	<Watchmate version='1.0' priority='0'>
+    	</Watchmate>`; 
+    res.send( new Buffer(xml,'latin1') );
 });
 
 app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort}!`))
@@ -1497,8 +1518,6 @@ tcpServer.on('connection', function(socket) {
 // ======================= TCP CLIENT ========================
 // gets data from AIS
 
-var AisDecode  = require ("ggencoder").AisDecode;
-var NmeaDecode = require ("ggencoder").NmeaDecode;
 
 let client = new net.Socket()
 
@@ -1515,225 +1534,7 @@ function connect() {
 
     client.on("data", data => {
         console.log("Received: " + data);
-        
-        // FIXME: need to guard against multiple lines coming through at once. need to split on carriage returns.
-        
-        var dataString = data.toString('latin1');
-        
-        // decode and AIS message
-        if (dataString.startsWith('!AI')) { 
-            var decMsg = new AisDecode (dataString);
-            console.log ('%j', decMsg);
-            
-            // !AIVDM,1,1,,A,H39WO5PpE8EE>0TT00000000000,2*28
-            // User ID (MMSI) 211410710
-            // Name NEREUS II@@@@@@@@@@@
-            // {
-            // "bitarray":[152,131,137,167,159,133,160,184,149,136,149,149,142,128,164,164,128,128,128,128,128,128,128,128,128,128,128],
-            // "valid":true,
-            // "error":"",
-            // "payload":{
-            // "type":"Buffer",
-            // "data":[72,51,57,87,79,53,80,112,69,56,69,69,62,48,84,84,48,48,48,48,48,48,48,48,48,48,48]
-            // },
-            // "msglen":27,
-            // "channel":"A",
-            // "aistype":24,
-            // "repeat":0,
-            // "immsi":211410710,
-            // "mmsi":"211410710",
-            // "class":"B",
-            // "part":0,
-            // "shipname":"NEREUS II"
-            // }
-            
-            // !AIVDM,1,1,,A,H39WO5TT@<CD9=?49>=j00000000,0*6D
-            // {
-            // "bitarray":[152,131,137,167,159,133,164,164,144,140,147,148,137,141,143,132,137,142,141,178,128,128,128,128,128,128,128,128],
-            // "valid":true,
-            // "error":"",
-            // "payload":{
-            // "type":"Buffer",
-            // "data":[72,51,57,87,79,53,84,84,64,60,67,68,57,61,63,52,57,62,61,106,48,48,48,48,48,48,48,48]},
-            // "msglen":28,
-            // "channel":"A",
-            // "aistype":24,
-            // "repeat":0,
-            // "immsi":211410710,
-            // "mmsi":"211410710",
-            // "class":"B",
-            // "part":1,
-            // "cargo":36,
-            // "callsign":"DINM2",
-            // "dimA":0,
-            // "dimB":0,
-            // "dimC":0,
-            // "dimD":0,
-            // "length":0,
-            // "width":0
-            // }
-            
-            // {
-            // "bitarray":[129,133,158,137,169,175,128,160,128,128,154,162,165,168,172,149,159,136,159,171,138,143,190,188,130,148,128,151],
-            // "valid":true,
-            // "error":"",
-            // "payload":{
-            // "type":"Buffer",
-            // "data":[49,53,78,57,97,103,48,80,48,48,74,82,85,96,100,69,79,56,79,99,58,63,118,116,50,68,48,71]
-            // },
-            // "msglen":28,
-            // "channel":"B",
-            // "aistype":1,
-            // "repeat":0,
-            // "immsi":367159740,
-            // "mmsi":"367159740",
-            // "class":"A",
-            // "navstatus":0,
-            // "lon":-76.33020333333333,
-            // "lat":37.55029,
-            // "rot":-128,
-            // "sog":0,
-            // "cog":285.6,
-            // "hdg":511,
-            // "utc":30,
-            // "smi":0
-            // }
-            
-            // for each target, we need to be able to access them by mmsi (key)
-            // we need to store when we last saw the target
-            // we need to age out old targets
-            // we need to periodically calculate/evaluate cpa, tcpa, bearing,
-	    // range, dangerstate, alarmtype
-            
-            // data structure probably should be something like:
-            // targets = {}
-            // target[mmsi] = {
-            // name: xyz
-            // latitudeText
-            // longitudeText
-            // COG2
-            // SOG
-            //
-            // }
-            
-            if (decMsg.valid && decMsg.mmsi) {
-        	
-        	var target = targets[decMsg.mmsi];
-		target.MMSI = decMsg.mmsi;
-        	
-        	console.log('target',target);
-        	
-        	if (!target) {
-        	    target = {};
-        	}
-        	
-        	console.log('target',target);
-
-        	//                var target = {
-//        		MMSI: '',
-//        		Name: '',
-//        	        latitudeText: '',
-//        	        longitudeText: '',
-//        	        COG2: '',
-//        	        SOG: '',
-//        	        VesselTypeString: '',
-//        	        VesselType: '',
-//        	        TargetType: '',
-//        	};
-
-        	if (decMsg.shipname !== undefined) {
-        	    target.Name = decMsg.shipname;
-        	}
-        	
-        	if (decMsg.lat !== undefined) {
-        	    target.lat = decMsg.lat;
-        	    target.lon = decMsg.lon;
-        	    target.latitudeText = formatLat(decMsg.lat);
-        	    target.longitudeText = formatLon(decMsg.lon);
-        	}
-        	
-        	if (decMsg.cog !== undefined) {
-        	    target.COG2 = ('00' + Math.round(decMsg.cog)).slice(-3);
-        	}
-
-        	if (decMsg.sog !== undefined) {
-        	    target.SOG = decMsg.sog.toFixed(1);
-        	}
-
-        	if (decMsg.cargo !== undefined) {
-        	    target.VesselType = decMsg.cargo;
-        	    target.VesselTypeString = decMsg.GetVesselType();
-        	}
-		    
-		// FIXME: add NAV_STATUS. decMsg.GetNavStatus()
-		//     0:  "Under way using engine",
-		//     1:  "At anchor"  
-		    
-		// FIXME: add MSG_TYPE. decMsg.Getaistype()... probably not too interesting
-		//     1:  "Position Report Class A",
-		//    14:  "Safety Related Broadcast Message",
-        	
-        	targets[decMsg.mmsi] = target;
-
-        	console.log('target',target);
-        	console.log('targets',targets);
-
-            }
-
-        }
-        
-        // decode NMEA message
-        if (dataString.startsWith('$GP')) { 
-            var decMsg = new NmeaDecode (dataString);
-            console.log ('%j', decMsg);
-            
-            // {
-            // "nmea":["$GPRMC","203901.00","A","3732.59922","N","07619.93996","W","0.018","77.90","201018","10.96","W","A*3D\n"],
-            // "valid":true,
-            // "cmd":2,
-            // "mssi":0,
-            // "time":"203901.00",
-            // "lat":37.543320333333334,
-            // "lon":-76.33233266666666,
-            // "sog":0,
-            // "cog":77.9,
-            // "day":"201018",
-            // "alt":10.96,
-            // "date":1603053541000
-            // }
-
-            // var gpsModel = {
-            // latitudeText: 'N 39° 57.0689',
-            // longitudeText: 'W 075° 08.3692',
-            // COG: '090',
-            // SOG: '0.0'
-            // };
-		
-	    // FIXME: add GPS accuracy and satellite data
-		
-	    // FIXME: add magvar
-
-            if (decMsg.valid) {
-        	if (decMsg.lat !== undefined) {
-        	    gpsModel.lat = decMsg.lat;
-        	    gpsModel.lon = decMsg.lon;
-        	    gpsModel.latitudeText = formatLat(decMsg.lat);
-        	    gpsModel.longitudeText = formatLon(decMsg.lon);
-        	}
-        	
-        	if (decMsg.cog !== undefined) {
-        	    gpsModel.COG = ('00' + Math.round(decMsg.cog)).slice(-3);
-        	}
-
-        	if (decMsg.sog !== undefined) {
-        	    gpsModel.SOG = decMsg.sog.toFixed(1);
-        	}
-
-        	console.log('gpsModel',gpsModel);
-            }
-            
-        }
-
+        processReceivedAisData(data);
     });
 
     client.on("close", () => {
@@ -1752,23 +1553,251 @@ function connect() {
     });
 }
 
+function processReceivedAisData(data) {
+    var dataString = data.toString('latin1');
+    var lines = dataString.split(/\r\n|\r|\n/g);
+    
+    for (var line of lines) {
+	processAIScommand(line);
+    }
+}
+
+function processAIScommand(line) {
+    
+    console.log('processAIScommand',line);
+
+    // decode and AIS message
+    if (line.startsWith('!AI')) { 
+        var decMsg = new AisDecode (line, aisSession);
+        console.log ('%j', decMsg);
+        
+        // !AIVDM,1,1,,A,H39WO5PpE8EE>0TT00000000000,2*28
+        // User ID (MMSI) 211410710
+        // Name NEREUS II@@@@@@@@@@@
+        // {
+        // "bitarray":[152,131,137,167,159,133,160,184,149,136,149,149,142,128,164,164,128,128,128,128,128,128,128,128,128,128,128],
+        // "valid":true,
+        // "error":"",
+        // "payload":{
+        // "type":"Buffer",
+        // "data":[72,51,57,87,79,53,80,112,69,56,69,69,62,48,84,84,48,48,48,48,48,48,48,48,48,48,48]
+        // },
+        // "msglen":27,
+        // "channel":"A",
+        // "aistype":24,
+        // "repeat":0,
+        // "immsi":211410710,
+        // "mmsi":"211410710",
+        // "class":"B",
+        // "part":0,
+        // "shipname":"NEREUS II"
+        // }
+        
+        // !AIVDM,1,1,,A,H39WO5TT@<CD9=?49>=j00000000,0*6D
+        // {
+        // "bitarray":[152,131,137,167,159,133,164,164,144,140,147,148,137,141,143,132,137,142,141,178,128,128,128,128,128,128,128,128],
+        // "valid":true,
+        // "error":"",
+        // "payload":{
+        // "type":"Buffer",
+        // "data":[72,51,57,87,79,53,84,84,64,60,67,68,57,61,63,52,57,62,61,106,48,48,48,48,48,48,48,48]},
+        // "msglen":28,
+        // "channel":"A",
+        // "aistype":24,
+        // "repeat":0,
+        // "immsi":211410710,
+        // "mmsi":"211410710",
+        // "class":"B",
+        // "part":1,
+        // "cargo":36,
+        // "callsign":"DINM2",
+        // "dimA":0,
+        // "dimB":0,
+        // "dimC":0,
+        // "dimD":0,
+        // "length":0,
+        // "width":0
+        // }
+        
+        // {
+        // "bitarray":[129,133,158,137,169,175,128,160,128,128,154,162,165,168,172,149,159,136,159,171,138,143,190,188,130,148,128,151],
+        // "valid":true,
+        // "error":"",
+        // "payload":{
+        // "type":"Buffer",
+        // "data":[49,53,78,57,97,103,48,80,48,48,74,82,85,96,100,69,79,56,79,99,58,63,118,116,50,68,48,71]
+        // },
+        // "msglen":28,
+        // "channel":"B",
+        // "aistype":1,
+        // "repeat":0,
+        // "immsi":367159740,
+        // "mmsi":"367159740",
+        // "class":"A",
+        // "navstatus":0,
+        // "lon":-76.33020333333333,
+        // "lat":37.55029,
+        // "rot":-128,
+        // "sog":0,
+        // "cog":285.6,
+        // "hdg":511,
+        // "utc":30,
+        // "smi":0
+        // }
+        
+        // for each target, we need to be able to access them by mmsi (key)
+        // we need to store when we last saw the target
+        // we need to age out old targets
+        // we need to periodically calculate/evaluate cpa, tcpa, bearing,
+	    // range, dangerstate, alarmtype
+        
+        // data structure probably should be something like:
+        // targets = {}
+        // target[mmsi] = {
+        // name: xyz
+        // latitudeText
+        // longitudeText
+        // COG2
+        // SOG
+        //
+        // }
+        
+        if (decMsg.valid && decMsg.mmsi) {
+    	
+    	var target = targets[decMsg.mmsi];
+    	
+    	console.log('target',target);
+    	
+    	if (!target) {
+    	    target = {};
+    	}
+
+		target.MMSI = decMsg.mmsi;
+
+    	console.log('target',target);
+
+    	// var target = {
+// MMSI: '',
+// Name: '',
+// latitudeText: '',
+// longitudeText: '',
+// COG2: '',
+// SOG: '',
+// VesselTypeString: '',
+// VesselType: '',
+// TargetType: '',
+// };
+
+    	if (decMsg.shipname !== undefined) {
+    	    target.Name = decMsg.shipname;
+    	}
+    	
+    	if (decMsg.lat !== undefined) {
+    	    target.lat = decMsg.lat;
+    	    target.lon = decMsg.lon;
+    	    target.latitudeText = formatLat(decMsg.lat);
+    	    target.longitudeText = formatLon(decMsg.lon);
+    	    calculateRangeAndBearing(target);
+    	}
+    	
+    	if (decMsg.cog !== undefined) {
+    	    target.COG2 = ('00' + Math.round(decMsg.cog)).slice(-3);
+    	}
+
+    	if (decMsg.sog !== undefined) {
+    	    target.SOG = decMsg.sog.toFixed(1);
+    	}
+
+    	if (decMsg.cargo !== undefined) {
+    	    target.VesselType = decMsg.cargo;
+    	    target.VesselTypeString = decMsg.GetVesselType();
+    	}
+		    
+		// FIXME: add NAV_STATUS. decMsg.GetNavStatus()
+		// 0: "Under way using engine",
+		// 1: "At anchor"
+		    
+		// FIXME: add MSG_TYPE. decMsg.Getaistype()... probably not too
+		// interesting
+		// 1: "Position Report Class A",
+		// 14: "Safety Related Broadcast Message",
+    	
+    	targets[decMsg.mmsi] = target;
+
+    	console.log('target',target);
+    	console.log('targets',targets);
+
+        }
+
+    }
+    
+    // decode NMEA message
+    if (line.startsWith('$GP')) {
+        var decMsg = new NmeaDecode (line);
+        console.log ('%j', decMsg);
+        
+        // {
+        // "nmea":["$GPRMC","203901.00","A","3732.59922","N","07619.93996","W","0.018","77.90","201018","10.96","W","A*3D\n"],
+        // "valid":true,
+        // "cmd":2,
+        // "mssi":0,
+        // "time":"203901.00",
+        // "lat":37.543320333333334,
+        // "lon":-76.33233266666666,
+        // "sog":0,
+        // "cog":77.9,
+        // "day":"201018",
+        // "alt":10.96,
+        // "date":1603053541000
+        // }
+
+        // var gpsModel = {
+        // latitudeText: 'N 39° 57.0689',
+        // longitudeText: 'W 075° 08.3692',
+        // COG: '090',
+        // SOG: '0.0'
+        // };
+		
+	    // FIXME: add GPS accuracy and satellite data
+		
+        if (decMsg.valid) {
+            if (decMsg.lat !== undefined) {
+        	gpsModel.lat = decMsg.lat;
+        	gpsModel.lon = decMsg.lon;
+        	gpsModel.latitudeText = formatLat(decMsg.lat);
+        	gpsModel.longitudeText = formatLon(decMsg.lon);
+        	gpsModel.magvar = Magvar.Get(gpsModel.lat, gpsModel.lon).toFixed(2);
+            }
+	
+            if (decMsg.cog !== undefined) {
+    	    	gpsModel.COG = ('00' + Math.round(decMsg.cog)).slice(-3);
+            }
+
+            if (decMsg.sog !== undefined) {
+        	gpsModel.SOG = decMsg.sog.toFixed(1);
+            }
+
+            console.log('gpsModel',gpsModel);
+        }
+        
+    }
+}
+
 // function that reconnect the client to the server
-reconnect = () => {
+function reconnect() {
     setTimeout(() => {
         client.removeAllListeners(); 
         connect();
     }, 1000);
 }
 
-connect()
-
-// FIXME: need to zero pad minutes to 2 characters
+connect();
 
 // latitudeText: 'N 39° 57.0689',
 function formatLat(dec) {
     var decAbs = Math.abs(dec);
     var deg = ('0' + Math.floor(decAbs)).slice(-2)  ;
-    var min = ((decAbs - deg) * 60).toFixed(4);
+    var min = ('0' + ((decAbs - deg) * 60).toFixed(4)).slice(-7);
     return (dec > 0 ? "N" : "S") + " " + deg + "° " + min;
 }
 
@@ -1776,6 +1805,31 @@ function formatLat(dec) {
 function formatLon(dec) {
     var decAbs = Math.abs(dec);
     var deg = ('00' + Math.floor(decAbs)).slice(-3)  ;
-    var min = ((decAbs - deg) * 60).toFixed(4);
+    var min = ('0' + ((decAbs - deg) * 60).toFixed(4)).slice(-7);
     return (dec > 0 ? "E" : "W") + " " + deg + "° " + min;
+}
+
+function calculateRangeAndBearing(target) {
+    if (gpsModel.lat === undefined) {
+	return;
+    }
+    
+    // geolib.getDistanceSimple
+    
+    var range = geolib.convertUnit(
+	    'sm', 
+	    geolib.getDistance(
+		    {latitude: gpsModel.lat, longitude: gpsModel.lon},
+		    {latitude: target.lat, longitude: target.lon}
+	    )
+    ).toFixed(2);
+    
+    var bearing = Math.round(geolib.getRhumbLineBearing(
+	    {latitude: gpsModel.lat, longitude: gpsModel.lon},
+	    {latitude: target.lat, longitude: target.lon}
+    ));
+    
+    target.Range = range;
+    target.Bearing = bearing;
+
 }
