@@ -1,7 +1,7 @@
 "use strict";
 
-const express = require('express')
-const app = express()
+const express = require('express');
+const app = express();
 
 const net = require('net');
 const xml = require('xml');
@@ -11,6 +11,26 @@ const geolib = require('geolib');
 const x = require('lethexa-motionpredict');
 const Magvar = require('magvar');
 
+var MathFunc = {
+	    add : function(a, b) {
+		return [ a[0] + b[0], a[1] + b[1], a[2] + b[2] ]
+	    },
+	    sub : function(a, b) {
+		return [ a[0] - b[0], a[1] - b[1], a[2] - b[2] ]
+	    },
+	    mulScalar : function(a, s) {
+		return [ a[0] * s, a[1] * s, a[2] * s ]
+	    },
+	    dot : function(a, b) {
+		return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+	    },
+	    lengthSquared : function(a) {
+		return a[0] * a[0] + a[1] * a[1] + a[2] * a[2]
+	    }
+	};
+
+const motionpredict = require('lethexa-motionpredict').withMathFunc(MathFunc);
+	
 const tcpPort = 39150;
 const httpPort = 39151;
 
@@ -647,8 +667,8 @@ function getTargetsXml() {
 <VesselType>${target.VesselType||''}</VesselType>
 <TargetType>1</TargetType>
 <Order>8190</Order>
-<TCPA></TCPA>
-<CPA></CPA>
+<TCPA>${target.TCPA||''}</TCPA>
+<CPA>${target.CPA||''}</CPA>
 <Bearing>${target.Bearing||''}</Bearing>
 <Range>${target.Range||''}</Range>
 <COG2>${target.COG2||''}</COG2>
@@ -1335,8 +1355,8 @@ function getTargetDetails(mmsi) {
 <VesselType>${target.VesselType||''}</VesselType>
 <TargetType>1</TargetType>
 <Order>8190</Order>
-<TCPA></TCPA>
-<CPA></CPA>
+<TCPA>${target.TCPA||''}</TCPA>
+<CPA>${target.CPA||''}</CPA>
 <Bearing>${target.Bearing||''}</Bearing>
 <Range>${target.Range||''}</Range>
 <COG2>${target.COG2||''}</COG2>
@@ -1346,8 +1366,8 @@ function getTargetDetails(mmsi) {
 <FilteredState>show</FilteredState>
 </Target>`
 
-	//    <COG>${target.COG2||''}</COG>
-	//    <HDG>30</HDG>
+	// <COG>${target.COG2||''}</COG>
+	// <HDG>30</HDG>
 
 	// DangerState: danger, ???
 	// AlarmType: guard, ????
@@ -1701,10 +1721,12 @@ function processAIScommand(line) {
     	}
     	
     	if (decMsg.cog !== undefined) {
+    	    target.cog = decMsg.cog;
     	    target.COG2 = ('00' + Math.round(decMsg.cog)).slice(-3);
     	}
 
     	if (decMsg.sog !== undefined) {
+    	    target.sog = decMsg.sog;
     	    target.SOG = decMsg.sog.toFixed(1);
     	}
 
@@ -1770,10 +1792,12 @@ function processAIScommand(line) {
             }
 	
             if (decMsg.cog !== undefined) {
+        	gpsModel.cog = decMsg.cog;
     	    	gpsModel.COG = ('00' + Math.round(decMsg.cog)).slice(-3);
             }
 
             if (decMsg.sog !== undefined) {
+        	gpsModel.sog = decMsg.sog;
         	gpsModel.SOG = decMsg.sog.toFixed(1);
             }
 
@@ -1833,3 +1857,80 @@ function calculateRangeAndBearing(target) {
     target.Bearing = bearing;
 
 }
+
+setInterval(updateAllCpas, 5000);
+
+function updateAllCpas() {
+    for (var mmsi in targets) {
+	var target = targets[mmsi];
+	updateCpa(target);
+    }
+}
+
+function updateCpa(target) {
+    if (gpsModel.lat === undefined 
+	    || gpsModel.lon === undefined
+	    || gpsModel.sog === undefined
+	    || gpsModel.cog === undefined
+	    || target.lat === undefined
+	    || target.lon === undefined
+	    || target.sog === undefined
+	    || target.cog === undefined) {
+	console.log('cant calc cpa: missing data',target.MMSI);
+	return;
+    }
+    
+ // position: lat and lon in degrees
+ // velocity: in degrees/sec N/S and E/W
+
+ var position1 = [ gpsModel.lat, gpsModel.lon, 0 ];
+ var velocity1 = generateSpeedVector(gpsModel.lat,gpsModel.sog,gpsModel.cog);
+
+ var position2 = [ target.lat, target.lon, 0 ];
+ var velocity2 = generateSpeedVector(target.lon,target.sog,target.cog);
+ 
+ console.log(position1,velocity1,position2,velocity2);
+
+ // tcpa in seconds, from now
+
+ var tcpa = motionpredict.calcCPATime(position1,velocity1,position2,velocity2);
+ console.log('tcpa (Secs)',tcpa,tcpa/60,tcpa/3600);
+ 
+ if (!tcpa) {
+     console.log('cant calc tcpa: ',target.MMSI)
+     return;
+ }
+
+ var cpaPosition1 = motionpredict.getPositionByVeloAndTime(position1,velocity1,tcpa);
+ var cpaPosition2 = motionpredict.getPositionByVeloAndTime(position2,velocity2,tcpa);
+
+ var cpa = geolib.convertUnit('sm',geolib.getDistanceSimple({
+     latitude : cpaPosition1[0],
+     longitude : cpaPosition1[1]
+ }, {
+     latitude : cpaPosition2[0],
+     longitude : cpaPosition2[1]
+ }));
+
+ console.log('cpa (NM)',cpa);
+
+ target.CPA = cpa.toFixed(2);
+ // returns hh:mm:ss, e.g. 01:15:23
+ // 012345678901234567890
+ //            ********  start at 11, length 8
+ //               *****  start at 14, length 5
+ // 1970-01-01T00:00:07.000Z
+ target.TCPA = (tcpa<0 ? '-' : '') 
+ 	+ new Date(1000 * Math.abs(tcpa)).toISOString().substr(
+ 		Math.abs(tcpa)>=3600 ? 11 : 14, 
+ 			Math.abs(tcpa)>=3600 ? 8 : 5);
+
+}
+
+
+
+function generateSpeedVector (latitude, speed, course) {
+    var northSpeed = speed * Math.cos(course * Math.PI / 180) / 60 / 3600;
+    var eastSpeed = speed * Math.sin(course * Math.PI / 180) / 60 / 3600 * Math.abs(Math.sin(latitude * Math.PI / 180));
+    return [northSpeed, eastSpeed, 0]
+}    
