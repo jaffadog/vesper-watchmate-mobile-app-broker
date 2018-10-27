@@ -4,7 +4,7 @@ const express = require('express');
 const app = express();
 
 const net = require('net');
-const xml = require('xml');
+// const xml = require('xml');
 const AisDecode  = require ("ggencoder").AisDecode;
 const NmeaDecode = require ("ggencoder").NmeaDecode;
 const geolib = require('geolib');
@@ -30,7 +30,11 @@ var MathFunc = {
 	};
 
 const motionpredict = require('lethexa-motionpredict').withMathFunc(MathFunc);
-	
+
+// how many minutes to keep old targets that we have not seen and ais broadcast
+// for
+const ageOldTargetsTTL = 15;
+
 const tcpPort = 39150;
 const httpPort = 39151;
 
@@ -40,12 +44,23 @@ const iasPort = 3000;
 var targets = {};
 var aisSession = {};
 
+// $PVSP,DEVINFO,5.20.17443,XB6000H,NF14133,AI,05853001,3,2,7,,*2E..
+// 5.20.17443 = connectedDeviceTxVersion
+// XB6000H = connectedDeviceType
+// NF14133 = connectedDeviceSerialNumber
+
 var aisDeviceModel = {
-	connectedDeviceType: 'XB-8000',
-	connectedDeviceUiVersion: '3.04.17316',
-	connectedDeviceTxVersion: '5.20.17443',
-	connectedDeviceTxBbVersion: '1.2.4.0',
-	connectedDeviceSerialNumber: 'KW37070'
+	connectedDeviceType: 'vesper-watchmate-mobile-app-broker',
+	connectedDeviceUiVersion: '---',
+	connectedDeviceTxVersion: '---',
+	connectedDeviceTxBbVersion: '---',
+	connectedDeviceSerialNumber: '---'
+
+// connectedDeviceType: 'XB-8000',
+// connectedDeviceUiVersion: '3.04.17316',
+// connectedDeviceTxVersion: '5.20.17443',
+// connectedDeviceTxBbVersion: '1.2.4.0',
+// connectedDeviceSerialNumber: 'KW37070'
 };
 
 // NEED SAMPLES OF:
@@ -63,34 +78,17 @@ var aisDeviceModel = {
 // TCP Server Received:$PVSP,KDGST,S*19
 // TCP Server Received:$PVSP,QNEMOELEMS*23
 
+// GET /prefs/setPreferences?profile.current=COASTAL
+// GET /prefs/getPreferences?profile.current
 
+// GET /v3/watchMate/collisionProfiles
 
+// GET /datamodel/getModel?OwnStaticData
+// OwnStaticData.vesselType
+// OwnStaticData.mmsi
+// OwnStaticData.name
+// OwnStaticData.callSign
 
-// function getDeviceModelXml(aisDeviceModel) {
-// var deviceModelXml = {
-// Watchmate: [{
-// _attr: {
-// version: '1.0',
-// priority: '0'
-// }
-// }, {
-// DeviceModel: [{
-// connectedDeviceType: aisDeviceModel.connectedDeviceType
-// }, {
-// connectedDeviceUiVersion: aisDeviceModel.connectedDeviceUiVersion
-// }, {
-// connectedDeviceTxVersion: aisDeviceModel.connectedDeviceTxVersion
-// }, {
-// connectedDeviceTxBbVersion: aisDeviceModel.connectedDeviceTxBbVersion
-// }, {
-// connectedDeviceSerialNumber: aisDeviceModel.connectedDeviceSerialNumber
-// }]
-// }]
-// };
-// return xml(deviceModelXml, { declaration: true });
-// }
-//
-// console.log(getDeviceModelXml(aisDeviceModel));
 
 function getDeviceModelXml() {
 	var xml = 
@@ -127,9 +125,9 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <hasGPS>1</hasGPS>
 <latitudeText>${gpsModel.latitudeText||''}</latitudeText>
 <longitudeText>${gpsModel.longitudeText||''}</longitudeText>
-<COG>${gpsModel.COG||''}</COG>
-<SOG>${gpsModel.SOG||''}</SOG>
-<HDGT></HDGT>
+<COG>${formatCog(gpsModel.cog)}</COG>
+<SOG>${formatSog(gpsModel.sog)}</SOG>
+<HDGT>${formatCog(gpsModel.hdg)}</HDGT>
 <magvar>${gpsModel.magvar||''}</magvar>
 <hasBowPosition>0</hasBowPosition>
 <sim>stop</sim>
@@ -151,9 +149,9 @@ function getGpsModelAdvancedXml() {
 <hasGPS>1</hasGPS>
 <latitudeText>${gpsModel.latitudeText||''}</latitudeText>
 <longitudeText>${gpsModel.longitudeText||''}</longitudeText>
-<COG>${gpsModel.COG||''}</COG>
-<SOG>${gpsModel.SOG||''}</SOG>
-<HDGT></HDGT>
+<COG>${formatCog(gpsModel.cog)}</COG>
+<SOG>${formatSog(gpsModel.sog)}</SOG>
+<HDGT>${formatCog(gpsModel.hdg)}</HDGT>
 <magvar>${gpsModel.magvar||''}</magvar>
 <hasBowPosition>0</hasBowPosition>
 <sim>stop</sim>
@@ -317,322 +315,29 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 }
 
 function getAlarmsXml() {
-return `<?xml version='1.0' encoding='ISO-8859-1' ?>
-<Watchmate version='1.0' priority='1'>
-</Watchmate>`;
+    var response = 
+`<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='1'>`;    
 
-// <?xml version='1.0' encoding='ISO-8859-1' ?>
-// <Watchmate version='1.0' priority='1'>
-// <Alarm MMSI='256850000' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>3.19</Range>
-// <BearingTrue>058</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// </Watchmate>
+    for (var mmsi in targets) {
+        var target = targets[mmsi];
+        if (target.dangerState) {
+            response += 
+`<Alarm MMSI='${target.mmsi}' state='${target.dangerState||''}' type='${target.alarmType||''}'>
+<Name>${target.name||''}</Name>
+<COG>${formatCog(target.cog)}</COG>
+<SOG>${formatSog(target.sog)}</SOG>
+<CPA>${formatCpa(target.cpa)}</CPA>
+<TCPA>${formatTcpa(target.tcpa)}</TCPA>
+<Range>${formatRange(target.range)}</Range>
+<BearingTrue>${target.bearing||''}</BearingTrue>
+<TargetType></TargetType>
+</Alarm>`;
+        }
+    }
 
-// <Alarm MMSI='993672159' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>3.16</Range>
-// <BearingTrue>177</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-
-
-	
-// return `<?xml version='1.0' encoding='ISO-8859-1' ?>
-// <Watchmate version='1.0' priority='1'>
-// <Alarm MMSI='255805923' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>3.16</Range>
-// <BearingTrue>177</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// </Watchmate>`
-
-// <Alarm MMSI='256850000' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>3.19</Range>
-// <BearingTrue>058</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='338211341' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>0.48</Range>
-// <BearingTrue>185</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='338447000' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>5.95</Range>
-// <BearingTrue>216</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='338737000' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>2.77</Range>
-// <BearingTrue>055</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='338997000' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>5.15</Range>
-// <BearingTrue>213</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='352610000' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>2.78</Range>
-// <BearingTrue>168</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='366855710' state='danger' type='guard,cpa'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>1.21</Range>
-// <BearingTrue>174</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='366939770' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>1.16</Range>
-// <BearingTrue>170</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='366966060' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA>1.71</CPA>
-// <TCPA>6:52:48</TCPA>
-// <Range>2.12</Range>
-// <BearingTrue>069</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367061610' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>4.39</Range>
-// <BearingTrue>188</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367097920' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA>2.05</CPA>
-// <TCPA>1:19:18</TCPA>
-// <Range>5.50</Range>
-// <BearingTrue>213</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367141210' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>0.98</Range>
-// <BearingTrue>186</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367148870' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>0.57</Range>
-// <BearingTrue>187</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367315470' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>2.82</Range>
-// <BearingTrue>055</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367318760' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>4.32</Range>
-// <BearingTrue>215</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367379670' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>4.23</Range>
-// <BearingTrue>219</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367428270' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>4.24</Range>
-// <BearingTrue>214</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367552410' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>4.28</Range>
-// <BearingTrue>204</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367571980' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>0.51</Range>
-// <BearingTrue>143</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='367741150' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>3.01</Range>
-// <BearingTrue>175</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='440371000' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>2.88</Range>
-// <BearingTrue>174</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='477168200' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>1.87</Range>
-// <BearingTrue>176</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='477333300' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>1.15</Range>
-// <BearingTrue>173</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='564045000' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>2.43</Range>
-// <BearingTrue>051</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='636018470' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>2.18</Range>
-// <BearingTrue>165</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='636092827' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>3.01</Range>
-// <BearingTrue>176</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// <Alarm MMSI='993663001' state='danger' type='guard'>
-// <Name></Name>
-// <COG></COG>
-// <SOG></SOG>
-// <CPA></CPA>
-// <TCPA></TCPA>
-// <Range>3.81</Range>
-// <BearingTrue>062</BearingTrue>
-// <TargetType></TargetType>
-// </Alarm>
-// </Watchmate>`
+    response += '</Watchmate>';
+    return response;
 }
 
 function getSimsXml() {
@@ -653,675 +358,32 @@ function getTargetsXml() {
 `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>`;	
 
-    console.log('targets',targets);
-    
     for (var mmsi in targets) {
 	var target = targets[mmsi];
-	console.log('target',target);
 	response += 
 `<Target>
-<MMSI>${target.MMSI}</MMSI>
-<Name>${target.Name||''}</Name>
-<CallSign></CallSign> 
+<MMSI>${target.mmsi}</MMSI>
+<Name>${target.name||''}</Name>
+<CallSign>${target.callsign||''}</CallSign> 
 <VesselTypeString>${target.VesselTypeString||''}</VesselTypeString>
 <VesselType>${target.VesselType||''}</VesselType>
 <TargetType>1</TargetType>
-<Order>8190</Order>
-<TCPA>${target.TCPA||''}</TCPA>
-<CPA>${target.CPA||''}</CPA>
-<Bearing>${target.Bearing||''}</Bearing>
-<Range>${target.Range||''}</Range>
-<COG2>${target.COG2||''}</COG2>
-<SOG>${target.SOG||''}</SOG>
-<DangerState>danger</DangerState>
-<AlarmType>guard</AlarmType>
-<FilteredState>show</FilteredState>
+<Order>${target.order||''}</Order>
+<TCPA>${formatTcpa(target.tcpa)}</TCPA>
+<CPA>${formatCpa(target.cpa)}</CPA>
+<Bearing>${target.bearing||''}</Bearing>
+<Range>${formatRange(target.range)}</Range>
+<COG2>${formatCog(target.cog)}</COG2>
+<SOG>${formatSog(target.sog)}</SOG>
+<DangerState>${target.dangerState||''}</DangerState>
+<AlarmType>${target.alarmType||''}</AlarmType>
+<FilteredState>${target.filteredState||''}</FilteredState>
 </Target>`;
-		
-	// warning danger guard
-	// DangerState: danger, ???
-	// AlarmType: guard, ????
-	// FilteredState: show, hide
     }
 
     response += '</Watchmate>';
     return response;
-
-// return `<?xml version='1.0' encoding='ISO-8859-1' ?>
-// <Watchmate version='1.0' priority='0'>
-// <Target>
-// <MMSI>993672159</MMSI>
-// <Name>14</Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Beacon: Starboard hand</VesselTypeString>
-// <VesselType>14</VesselType>
-// <TargetType>4</TargetType>
-// <Order>36862</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>216</Bearing>
-// <Range>28.2</Range>
-// <COG2></COG2>
-// <SOG></SOG>
-// <DangerState></DangerState>
-// <AlarmType></AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// </Watchmate>`
-	
-// return `<?xml version='1.0' encoding='ISO-8859-1' ?>
-// <Watchmate version='1.0' priority='0'>
-// <Target>
-// <MMSI>255805923</MMSI>
-// <Name>Ribbit</Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>0</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>177</Bearing>
-// <Range>3.16</Range>
-// <COG2>146</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// </Watchmate>`
-
-// <Target>
-// <MMSI>256850000</MMSI>
-// <Name>ATLANTIC NAVIGATORII</Name>
-// <CallSign>9HA4023</CallSign>
-// <VesselTypeString>Cargo</VesselTypeString>
-// <VesselType>79</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>058</Bearing>
-// <Range>3.19</Range>
-// <COG2>257</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>338211341</MMSI>
-// <Name>SEA FOX</Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Pleasure craft</VesselTypeString>
-// <VesselType>37</VesselType>
-// <TargetType>2</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>185</Bearing>
-// <Range>0.48</Range>
-// <COG2>287</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>338447000</MMSI>
-// <Name></Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>0</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>216</Bearing>
-// <Range>5.95</Range>
-// <COG2>343</COG2>
-// <SOG>0.1</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>338737000</MMSI>
-// <Name>OCEAN WIND</Name>
-// <CallSign>WDG5141</CallSign>
-// <VesselTypeString>Tug</VesselTypeString>
-// <VesselType>52</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>055</Bearing>
-// <Range>2.77</Range>
-// <COG2>007</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>338997000</MMSI>
-// <Name>MCFARLAND</Name>
-// <CallSign>AEGB</CallSign>
-// <VesselTypeString>Dredging</VesselTypeString>
-// <VesselType>33</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>213</Bearing>
-// <Range>5.15</Range>
-// <COG2>359</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>352610000</MMSI>
-// <Name>MARBELLA CARRIER</Name>
-// <CallSign>3FJE9</CallSign>
-// <VesselTypeString>Cargo</VesselTypeString>
-// <VesselType>70</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>168</Bearing>
-// <Range>2.78</Range>
-// <COG2>026</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>366855710</MMSI>
-// <Name>GRAMMA LEE T MORAN</Name>
-// <CallSign>WDA8564</CallSign>
-// <VesselTypeString>Tug</VesselTypeString>
-// <VesselType>52</VesselType>
-// <TargetType>1</TargetType>
-// <Order>4188</Order>
-// <TCPA>11:27</TCPA>
-// <CPA>0.00</CPA>
-// <Bearing>175</Bearing>
-// <Range>1.39</Range>
-// <COG2>355</COG2>
-// <SOG>7.3</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard,cpa</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>366939770</MMSI>
-// <Name>CAPE COD</Name>
-// <CallSign>WBK3243</CallSign>
-// <VesselTypeString>Tug</VesselTypeString>
-// <VesselType>52</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8188</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>171</Bearing>
-// <Range>2.69</Range>
-// <COG2>184</COG2>
-// <SOG>9.9</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>366966060</MMSI>
-// <Name>CONSORT</Name>
-// <CallSign>WSQ3331</CallSign>
-// <VesselTypeString>Towing</VesselTypeString>
-// <VesselType>31</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>069</Bearing>
-// <Range>2.12</Range>
-// <COG2>015</COG2>
-// <SOG>0.1</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367061610</MMSI>
-// <Name>BARNEY TURECAMO</Name>
-// <CallSign>WDC6808</CallSign>
-// <VesselTypeString>Local (57)</VesselTypeString>
-// <VesselType>57</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>188</Bearing>
-// <Range>4.39</Range>
-// <COG2>342</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367061730</MMSI>
-// <Name></Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>0</VesselType>
-// <TargetType>1</TargetType>
-// <Order>36862</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>215</Bearing>
-// <Range>7.11</Range>
-// <COG2>207</COG2>
-// <SOG>0.1</SOG>
-// <DangerState></DangerState>
-// <AlarmType></AlarmType>
-// <FilteredState>hide</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367097920</MMSI>
-// <Name></Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>0</VesselType>
-// <TargetType>1</TargetType>
-// <Order>5500</Order>
-// <TCPA>48:53</TCPA>
-// <CPA>0.96</CPA>
-// <Bearing>212</Bearing>
-// <Range>4.89</Range>
-// <COG2>021</COG2>
-// <SOG>5.9</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367141210</MMSI>
-// <Name>PILOT DELAWARE</Name>
-// <CallSign>WDD4172</CallSign>
-// <VesselTypeString>Pilot</VesselTypeString>
-// <VesselType>50</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>186</Bearing>
-// <Range>0.98</Range>
-// <COG2>178</COG2>
-// <SOG>0.1</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367148870</MMSI>
-// <Name>FREEDOM ELITE</Name>
-// <CallSign>WDD4775</CallSign>
-// <VesselTypeString>Passenger</VesselTypeString>
-// <VesselType>69</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>186</Bearing>
-// <Range>0.57</Range>
-// <COG2>032</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367315470</MMSI>
-// <Name>MARY M.COPPEDGE</Name>
-// <CallSign>WDD9722</CallSign>
-// <VesselTypeString>Other type</VesselTypeString>
-// <VesselType>90</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>055</Bearing>
-// <Range>2.83</Range>
-// <COG2>050</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367318760</MMSI>
-// <Name></Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>0</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>215</Bearing>
-// <Range>4.32</Range>
-// <COG2>000</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367379670</MMSI>
-// <Name></Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>0</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>219</Bearing>
-// <Range>4.23</Range>
-// <COG2>277</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367552410</MMSI>
-// <Name></Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>0</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>204</Bearing>
-// <Range>4.28</Range>
-// <COG2>205</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367571980</MMSI>
-// <Name>FREEDOM</Name>
-// <CallSign>WDG7901</CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>0</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>143</Bearing>
-// <Range>0.52</Range>
-// <COG2></COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>367741150</MMSI>
-// <Name>DR MILTON WANER</Name>
-// <CallSign>WDI8688</CallSign>
-// <VesselTypeString>Towing (&gt;200m)</VesselTypeString>
-// <VesselType>32</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>176</Bearing>
-// <Range>3.03</Range>
-// <COG2>231</COG2>
-// <SOG>0.2</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>440371000</MMSI>
-// <Name>ASIAN CAPTAIN</Name>
-// <CallSign>D7AQ</CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>70</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>174</Bearing>
-// <Range>2.89</Range>
-// <COG2>315</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>477168200</MMSI>
-// <Name>GREAT AGILITY</Name>
-// <CallSign>VRQB3</CallSign>
-// <VesselTypeString>Type not available</VesselTypeString>
-// <VesselType>70</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>176</Bearing>
-// <Range>1.87</Range>
-// <COG2>268</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>477333300</MMSI>
-// <Name>PAQUETA ISLAND</Name>
-// <CallSign>VRQO8</CallSign>
-// <VesselTypeString>Cargo</VesselTypeString>
-// <VesselType>70</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8188</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>173</Bearing>
-// <Range>1.71</Range>
-// <COG2>159</COG2>
-// <SOG>5.7</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>564045000</MMSI>
-// <Name>MTM SAVANNAH</Name>
-// <CallSign>9V2995</CallSign>
-// <VesselTypeString>Tanker</VesselTypeString>
-// <VesselType>80</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>051</Bearing>
-// <Range>2.43</Range>
-// <COG2>250</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>636018470</MMSI>
-// <Name>CHARADE</Name>
-// <CallSign>D5PV2</CallSign>
-// <VesselTypeString>Cargo</VesselTypeString>
-// <VesselType>70</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>165</Bearing>
-// <Range>2.18</Range>
-// <COG2>283</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>636092827</MMSI>
-// <Name>MAERSK WOLFSBURG</Name>
-// <CallSign>D5PZ5</CallSign>
-// <VesselTypeString>Cargo</VesselTypeString>
-// <VesselType>70</VesselType>
-// <TargetType>1</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>176</Bearing>
-// <Range>3.00</Range>
-// <COG2>245</COG2>
-// <SOG>0.0</SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>993663001</MMSI>
-// <Name>DELAIR BRG-CLOSED</Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Aid to navigation</VesselTypeString>
-// <VesselType>0</VesselType>
-// <TargetType>4</TargetType>
-// <Order>8190</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>062</Bearing>
-// <Range>3.82</Range>
-// <COG2></COG2>
-// <SOG></SOG>
-// <DangerState>danger</DangerState>
-// <AlarmType>guard</AlarmType>
-// <FilteredState>show</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>993672077</MMSI>
-// <Name>11</Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Port hand mark</VesselTypeString>
-// <VesselType>24</VesselType>
-// <TargetType>4</TargetType>
-// <Order>36862</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>218</Bearing>
-// <Range>30.4</Range>
-// <COG2></COG2>
-// <SOG></SOG>
-// <DangerState></DangerState>
-// <AlarmType></AlarmType>
-// <FilteredState>hide</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>993672078</MMSI>
-// <Name>13</Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Beacon: Port hand</VesselTypeString>
-// <VesselType>13</VesselType>
-// <TargetType>4</TargetType>
-// <Order>36862</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>220</Bearing>
-// <Range>29.8</Range>
-// <COG2></COG2>
-// <SOG></SOG>
-// <DangerState></DangerState>
-// <AlarmType></AlarmType>
-// <FilteredState>hide</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>993672079</MMSI>
-// <Name>CD</Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Channel starboard hand mark</VesselTypeString>
-// <VesselType>27</VesselType>
-// <TargetType>4</TargetType>
-// <Order>36862</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>220</Bearing>
-// <Range>30.1</Range>
-// <COG2></COG2>
-// <SOG></SOG>
-// <DangerState></DangerState>
-// <AlarmType></AlarmType>
-// <FilteredState>hide</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>993672159</MMSI>
-// <Name>14</Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Beacon: Starboard hand</VesselTypeString>
-// <VesselType>14</VesselType>
-// <TargetType>4</TargetType>
-// <Order>36862</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>216</Bearing>
-// <Range>28.2</Range>
-// <COG2></COG2>
-// <SOG></SOG>
-// <DangerState></DangerState>
-// <AlarmType></AlarmType>
-// <FilteredState>hide</FilteredState>
-// </Target>
-// <Target>
-// <MMSI>993672632</MMSI>
-// <Name>WR62</Name>
-// <CallSign></CallSign>
-// <VesselTypeString>Starboard hand mark</VesselTypeString>
-// <VesselType>25</VesselType>
-// <TargetType>4</TargetType>
-// <Order>36862</Order>
-// <TCPA></TCPA>
-// <CPA></CPA>
-// <Bearing>215</Bearing>
-// <Range>6.28</Range>
-// <COG2></COG2>
-// <SOG></SOG>
-// <DangerState></DangerState>
-// <AlarmType></AlarmType>
-// <FilteredState>hide</FilteredState>
-// </Target>
-// </Watchmate>`
 }
-
-// var target = {
-// MMSI: '256850000',
-// Name: 'ATLANTIC NAVIGATORII',
-// latitudeText: 'N 39° 57.0689',
-// longitudeText: 'W 075° 08.3692',
-// COG2: '090',
-// SOG: '0.0',
-// VesselTypeString: '',
-// VesselType: '',
-// TargetType: '',
-// };
-
 
 function getTargetDetails(mmsi) {
     var response = 
@@ -1334,8 +396,8 @@ function getTargetDetails(mmsi) {
 	response += 
 `<Target>
 <IMO>0</IMO>
-<COG>${target.COG2||''}</COG>
-<HDG></HDG>
+<COG>${formatCog(target.cog)}</COG>
+<HDG>${formatCog(target.hdg)}</HDG>
 <ROT></ROT>
 <Altitude>-1</Altitude>
 <LatitudeText>${target.latitudeText||''}</LatitudeText>
@@ -1344,34 +406,27 @@ function getTargetDetails(mmsi) {
 <Virtual>1</Virtual>
 <Dimensions>---</Dimensions>
 <Draft>---</Draft>
-<ClassType>ATON</ClassType>
+<ClassType>${target.classType||''}</ClassType>
 <Destination></Destination>
 <ETAText></ETAText>
-<NavStatus>15</NavStatus>
+<NavStatus>${target.navStatus||''}</NavStatus>
 <MMSI>${mmsi||''}</MMSI>
-<Name>${target.Name||''}</Name>
-<CallSign></CallSign> 
+<Name>${target.name||''}</Name>
+<CallSign>${target.callsign||''}</CallSign> 
 <VesselTypeString>${target.VesselTypeString||''}</VesselTypeString>
 <VesselType>${target.VesselType||''}</VesselType>
 <TargetType>1</TargetType>
-<Order>8190</Order>
-<TCPA>${target.TCPA||''}</TCPA>
-<CPA>${target.CPA||''}</CPA>
-<Bearing>${target.Bearing||''}</Bearing>
-<Range>${target.Range||''}</Range>
-<COG2>${target.COG2||''}</COG2>
-<SOG>${target.SOG||''}</SOG>
-<DangerState>danger</DangerState>
-<AlarmType>guard</AlarmType>
-<FilteredState>show</FilteredState>
-</Target>`
-
-	// <COG>${target.COG2||''}</COG>
-	// <HDG>30</HDG>
-
-	// DangerState: danger, ???
-	// AlarmType: guard, ????
-	// FilteredState: show, hide
+<Order>${target.order||''}</Order>
+<TCPA>${formatTcpa(target.tcpa)}</TCPA>
+<CPA>${formatCpa(target.cpa)}</CPA>
+<Bearing>${target.bearing||''}</Bearing>
+<Range>${formatRange(target.range)}</Range>
+<COG2>${formatCog(target.cog)}</COG2>
+<SOG>${formatSog(target.sog)}</SOG>
+<DangerState>${target.dangerState||''}</DangerState>
+<AlarmType>${target.alarmType||''}</AlarmType>
+<FilteredState>${target.filteredState||''}</FilteredState>
+</Target>`;
     }
 
     response += '</Watchmate>';
@@ -1507,41 +562,24 @@ tcpServer.on('connection', function(socket) {
  socket.write(data);
  }, 4000);
 
-    // socket.write('Echo server');
-    // socket.pipe(socket);
-
     socket.on('data', function(data) {
         var string = (data.toString());
         console.log('TCP Server Received:' + string)
-
-        // var data =
-        // `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-        // $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-        // $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-        // $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-        // $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-        // $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-        // $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
-        // socket.write(data);
-
     });
 
     socket.on('end', () => {
 	clearInterval(timerId);
 	console.log('TCP Server: client disconnected' + socket.remoteAddress +':'+ socket.remotePort);
     });
-
   
 });
-
 
 // ======================= TCP CLIENT ========================
 // gets data from AIS
 
-
 let client = new net.Socket()
 
-// FIXME:
+// FIXME: humm... ok
 client.setEncoding('latin1');
 
 function connect() {
@@ -1665,23 +703,6 @@ function processAIScommand(line) {
         // "smi":0
         // }
         
-        // for each target, we need to be able to access them by mmsi (key)
-        // we need to store when we last saw the target
-        // we need to age out old targets
-        // we need to periodically calculate/evaluate cpa, tcpa, bearing,
-	    // range, dangerstate, alarmtype
-        
-        // data structure probably should be something like:
-        // targets = {}
-        // target[mmsi] = {
-        // name: xyz
-        // latitudeText
-        // longitudeText
-        // COG2
-        // SOG
-        //
-        // }
-        
         if (decMsg.valid && decMsg.mmsi) {
     	
     	var target = targets[decMsg.mmsi];
@@ -1692,24 +713,13 @@ function processAIScommand(line) {
     	    target = {};
     	}
 
-		target.MMSI = decMsg.mmsi;
+	target.mmsi = decMsg.mmsi;
+	target.lastSeen = new Date().toISOString();
 
     	console.log('target',target);
 
-    	// var target = {
-// MMSI: '',
-// Name: '',
-// latitudeText: '',
-// longitudeText: '',
-// COG2: '',
-// SOG: '',
-// VesselTypeString: '',
-// VesselType: '',
-// TargetType: '',
-// };
-
     	if (decMsg.shipname !== undefined) {
-    	    target.Name = decMsg.shipname;
+    	    target.name = decMsg.shipname;
     	}
     	
     	if (decMsg.lat !== undefined) {
@@ -1717,17 +727,18 @@ function processAIScommand(line) {
     	    target.lon = decMsg.lon;
     	    target.latitudeText = formatLat(decMsg.lat);
     	    target.longitudeText = formatLon(decMsg.lon);
-    	    calculateRangeAndBearing(target);
     	}
     	
-    	if (decMsg.cog !== undefined) {
-    	    target.cog = decMsg.cog;
-    	    target.COG2 = ('00' + Math.round(decMsg.cog)).slice(-3);
-    	}
+        if (decMsg.cog !== undefined) {
+            target.cog = decMsg.cog;
+        }
+
+        if (decMsg.hdg !== undefined) {
+            target.hdg = decMsg.hdg;
+        }
 
     	if (decMsg.sog !== undefined) {
     	    target.sog = decMsg.sog;
-    	    target.SOG = decMsg.sog.toFixed(1);
     	}
 
     	if (decMsg.cargo !== undefined) {
@@ -1735,15 +746,24 @@ function processAIScommand(line) {
     	    target.VesselTypeString = decMsg.GetVesselType();
     	}
 		    
-		// FIXME: add NAV_STATUS. decMsg.GetNavStatus()
-		// 0: "Under way using engine",
-		// 1: "At anchor"
+    	// <NavStatus>15</NavStatus>
+        // 0: "Under way using engine",
+        // 1: "At anchor"
+        if (decMsg.navstatus !== undefined) {
+            target.navStatus = decMsg.navstatus;
+        }
 		    
-		// FIXME: add MSG_TYPE. decMsg.Getaistype()... probably not too
-		// interesting
+        // <ClassType>ATON</ClassType>
 		// 1: "Position Report Class A",
 		// 14: "Safety Related Broadcast Message",
-    	
+        if (decMsg.class !== undefined) {
+            target.classType = decMsg.class;
+        }
+
+        if (decMsg.callsign !== undefined) {
+            target.callsign = decMsg.callsign;
+        }
+
     	targets[decMsg.mmsi] = target;
 
     	console.log('target',target);
@@ -1780,25 +800,23 @@ function processAIScommand(line) {
         // SOG: '0.0'
         // };
 		
-	    // FIXME: add GPS accuracy and satellite data
+	    // FIXME: add GPS accuracy and satellite data... meh
 		
         if (decMsg.valid) {
             if (decMsg.lat !== undefined) {
-        	gpsModel.lat = decMsg.lat;
-        	gpsModel.lon = decMsg.lon;
-        	gpsModel.latitudeText = formatLat(decMsg.lat);
-        	gpsModel.longitudeText = formatLon(decMsg.lon);
-        	gpsModel.magvar = Magvar.Get(gpsModel.lat, gpsModel.lon).toFixed(2);
+            	gpsModel.lat = decMsg.lat;
+            	gpsModel.lon = decMsg.lon;
+            	gpsModel.latitudeText = formatLat(decMsg.lat);
+            	gpsModel.longitudeText = formatLon(decMsg.lon);
+            	gpsModel.magvar = Magvar.Get(gpsModel.lat, gpsModel.lon).toFixed(2);
             }
 	
             if (decMsg.cog !== undefined) {
-        	gpsModel.cog = decMsg.cog;
-    	    	gpsModel.COG = ('00' + Math.round(decMsg.cog)).slice(-3);
+                gpsModel.cog = decMsg.cog;
             }
 
             if (decMsg.sog !== undefined) {
-        	gpsModel.sog = decMsg.sog;
-        	gpsModel.SOG = decMsg.sog.toFixed(1);
+                gpsModel.sog = decMsg.sog;
             }
 
             console.log('gpsModel',gpsModel);
@@ -1807,15 +825,16 @@ function processAIScommand(line) {
     }
 }
 
-// function that reconnect the client to the server
+// do initial connection attempt to ais transponder
+connect();
+
+// try reconnect to the ais transponder if the connection drops
 function reconnect() {
     setTimeout(() => {
         client.removeAllListeners(); 
         connect();
     }, 1000);
 }
-
-connect();
 
 // latitudeText: 'N 39° 57.0689',
 function formatLat(dec) {
@@ -1834,11 +853,17 @@ function formatLon(dec) {
 }
 
 function calculateRangeAndBearing(target) {
-    if (gpsModel.lat === undefined) {
+    if (gpsModel.lat === undefined 
+	    || gpsModel.lon === undefined
+	    || target.lat === undefined
+	    || target.lon === undefined) {
+	console.log('cant calc calculateRangeAndBearing: missing data',target.mmsi);
+	target.range = undefined;
+	target.bearing = undefined;
 	return;
     }
-    
-    // geolib.getDistanceSimple
+
+    // or geolib.getDistanceSimple...?
     
     var range = geolib.convertUnit(
 	    'sm', 
@@ -1846,24 +871,34 @@ function calculateRangeAndBearing(target) {
 		    {latitude: gpsModel.lat, longitude: gpsModel.lon},
 		    {latitude: target.lat, longitude: target.lon}
 	    )
-    ).toFixed(2);
+    );
     
     var bearing = Math.round(geolib.getRhumbLineBearing(
 	    {latitude: gpsModel.lat, longitude: gpsModel.lon},
 	    {latitude: target.lat, longitude: target.lon}
     ));
     
-    target.Range = range;
-    target.Bearing = bearing;
-
+    target.range = range;
+    target.bearing = bearing;
 }
 
-setInterval(updateAllCpas, 5000);
+setInterval(updateAllTargets, 5000);
 
-function updateAllCpas() {
+function updateAllTargets() {
     for (var mmsi in targets) {
-	var target = targets[mmsi];
-	updateCpa(target);
+    	var target = targets[mmsi];
+    	// FIXME: age out old targets
+    	ageOutOldTargets(target);
+    	calculateRangeAndBearing(target);
+    	updateCpa(target);
+    	evaluateAlarms(target);
+    }
+}
+
+function ageOutOldTargets(target) {
+    if ( (new Date() - new Date(target.lastSeen))/1000/60 > ageOldTargetsTTL ) {
+        console.log('deleting',target.mmsi,target.lastSeen,new Date().toISOString());
+        delete targets[target.mmsi];
     }
 }
 
@@ -1876,61 +911,155 @@ function updateCpa(target) {
 	    || target.lon === undefined
 	    || target.sog === undefined
 	    || target.cog === undefined) {
-	console.log('cant calc cpa: missing data',target.MMSI);
+	console.log('cant calc cpa: missing data',target.mmsi);
+        target.cpa = undefined;
+        target.tcpa = undefined;
 	return;
     }
     
- // position: lat and lon in degrees
- // velocity: in degrees/sec N/S and E/W
-
- var position1 = [ gpsModel.lat, gpsModel.lon, 0 ];
- var velocity1 = generateSpeedVector(gpsModel.lat,gpsModel.sog,gpsModel.cog);
-
- var position2 = [ target.lat, target.lon, 0 ];
- var velocity2 = generateSpeedVector(target.lon,target.sog,target.cog);
- 
- console.log(position1,velocity1,position2,velocity2);
-
- // tcpa in seconds, from now
-
- var tcpa = motionpredict.calcCPATime(position1,velocity1,position2,velocity2);
- console.log('tcpa (Secs)',tcpa,tcpa/60,tcpa/3600);
- 
- if (!tcpa) {
-     console.log('cant calc tcpa: ',target.MMSI)
-     return;
- }
-
- var cpaPosition1 = motionpredict.getPositionByVeloAndTime(position1,velocity1,tcpa);
- var cpaPosition2 = motionpredict.getPositionByVeloAndTime(position2,velocity2,tcpa);
-
- var cpa = geolib.convertUnit('sm',geolib.getDistanceSimple({
-     latitude : cpaPosition1[0],
-     longitude : cpaPosition1[1]
- }, {
-     latitude : cpaPosition2[0],
-     longitude : cpaPosition2[1]
- }));
-
- console.log('cpa (NM)',cpa);
-
- target.CPA = cpa.toFixed(2);
- // returns hh:mm:ss, e.g. 01:15:23
- // 012345678901234567890
- //            ********  start at 11, length 8
- //               *****  start at 14, length 5
- // 1970-01-01T00:00:07.000Z
- target.TCPA = (tcpa<0 ? '-' : '') 
- 	+ new Date(1000 * Math.abs(tcpa)).toISOString().substr(
- 		Math.abs(tcpa)>=3600 ? 11 : 14, 
- 			Math.abs(tcpa)>=3600 ? 8 : 5);
-
+     // position: lat and lon in degrees
+     // velocity: in degrees/sec N/S and E/W
+    
+     var position1 = [ gpsModel.lat, gpsModel.lon, 0 ];
+     var velocity1 = generateSpeedVector(gpsModel.lat,gpsModel.sog,gpsModel.cog);
+    
+     var position2 = [ target.lat, target.lon, 0 ];
+     var velocity2 = generateSpeedVector(target.lon,target.sog,target.cog);
+     
+     // console.log(position1,velocity1,position2,velocity2);
+    
+     // tcpa in seconds, from now
+    
+     var tcpa = motionpredict.calcCPATime(position1,velocity1,position2,velocity2);
+     // console.log('tcpa (Secs)',tcpa,tcpa/60,tcpa/3600);
+     
+     if (!tcpa) {
+         console.log('cant calc tcpa: ',target.mmsi);
+         target.cpa = undefined;
+         target.tcpa = undefined;
+         return;
+     }
+    
+     var cpaPosition1 = motionpredict.getPositionByVeloAndTime(position1,velocity1,tcpa);
+     var cpaPosition2 = motionpredict.getPositionByVeloAndTime(position2,velocity2,tcpa);
+    
+     var cpa = geolib.convertUnit('sm',geolib.getDistanceSimple({
+         latitude : cpaPosition1[0],
+         longitude : cpaPosition1[1]
+     }, {
+         latitude : cpaPosition2[0],
+         longitude : cpaPosition2[1]
+     }));
+    
+     // console.log('cpa (NM)',cpa);
+    
+     target.cpa = cpa;
+     target.tcpa = tcpa;
 }
-
-
 
 function generateSpeedVector (latitude, speed, course) {
     var northSpeed = speed * Math.cos(course * Math.PI / 180) / 60 / 3600;
     var eastSpeed = speed * Math.sin(course * Math.PI / 180) / 60 / 3600 * Math.abs(Math.sin(latitude * Math.PI / 180));
     return [northSpeed, eastSpeed, 0]
 }    
+
+function evaluateAlarms(target) {
+    // <Order>8190</Order>
+    // <DangerState>danger</DangerState>
+    // <AlarmType>guard</AlarmType>
+    // <FilteredState>show</FilteredState>
+    
+    // guard alarm
+    target.guardAlarm = (target.range<2 && target.sog>1);
+    
+    // collision alarm
+    target.collisionAlarm = (target.cpa<0.1 && target.tcpa<300 && target.sog>3);
+        
+    // collision warning
+    target.collisionWarning = (target.cpa<0.5 && target.tcpa<600 && target.sog>0.5);
+
+    if (target.guardAlarm || target.collisionAlarm) {
+        target.dangerState = 'danger';
+    }
+    else if (target.collisionWarning) {
+        target.dangerState = 'warning';
+    }
+    else {
+        target.dangerState = undefined;
+    }
+    
+    var alarmType = '';
+    
+    if (target.guardAlarm) {
+        alarmType = 'guard';
+    }
+
+    if (target.collisionAlarm || target.collisionWarning) {
+        alarmType += (alarmType ? ',' : '') + 'cpa';
+    }
+    
+    target.alarmType = alarmType ? alarmType : undefined;
+
+    var order = 10000;
+    
+    if (target.dangerState) {
+        order -= 5000;
+        target.filteredState = 'show';
+    }
+    else {
+        target.filteredState = 'hide';
+    }
+
+    if (target.tcpa) {
+        // tcpa of 0 seconds reduces order by 1000 (this is an arbitrary
+        // weighting)
+        // tcpa of 60 minutes reduces order by 0
+        order -= (1000 - 1000/3600*(target.tcpa<0 ? 0 : target.tcpa));
+    }
+
+    if (target.cpa) {
+        // cpa of 0 nm reduces order by 2000 (this is an arbitrary weighting)
+        // cpa of 5 nm reduces order by 0
+        order -= (1000 - 2000/5*(target.cpa<0 ? 0 : target.cpa));
+    }
+
+    if (target.sog) {
+        // sog of 15 knots reduces order by 45 (this is an arbitrary weighting)
+        order -= 3*target.sog;
+    }
+    
+    target.order = Math.round(order);
+
+}
+
+function formatCog(cog) {
+    return cog === undefined ? '' : ('00' + Math.round(cog)).slice(-3);
+}
+
+function formatSog(sog) {
+    return sog === undefined ? '' : sog.toFixed(1);    
+}
+
+function formatCpa(cpa) {
+    return cpa === undefined ? '' : cpa.toFixed(2);
+}
+
+function formatTcpa(tcpa) {
+    // returns hh:mm:ss, e.g. 01:15:23
+    // 012345678901234567890
+    // ******** start at 11, length 8
+    // ***** start at 14, length 5
+    // 1970-01-01T00:00:07.000Z
+    if (tcpa === undefined) {
+        return '';
+    } else if (Math.abs(tcpa)>=3600) {
+        return new Date(1000 * Math.abs(tcpa)).toISOString().substr(11,8)
+    } else {
+        return new Date(1000 * Math.abs(tcpa)).toISOString().substr(14,5)
+    }
+}
+
+function formatRange(range) {
+    return range === undefined ? '' : range.toFixed(2);
+}
+
