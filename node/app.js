@@ -1,15 +1,18 @@
 "use strict";
 
+const AisEncode  = require ("ggencoder").AisEncode;
+const AisDecode  = require ("ggencoder").AisDecode;
+const NmeaEncode = require ("ggencoder").NmeaEncode;
+const NmeaDecode = require ("ggencoder").NmeaDecode;
+
 const express = require('express');
 const app = express();
+const bodyParser = require('body-parser');
 
 const net = require('net');
-// const xml = require('xml');
-const AisDecode  = require ("ggencoder").AisDecode;
-const NmeaDecode = require ("ggencoder").NmeaDecode;
 const geolib = require('geolib');
-const x = require('lethexa-motionpredict');
 const Magvar = require('magvar');
+var fs = require('fs');
 
 var MathFunc = {
 	    add : function(a, b) {
@@ -33,6 +36,7 @@ const motionpredict = require('lethexa-motionpredict').withMathFunc(MathFunc);
 
 // how many minutes to keep old targets that we have not seen and ais broadcast
 // for
+const ageOldTargets = true;
 const ageOldTargetsTTL = 15;
 
 const tcpPort = 39150;
@@ -41,39 +45,40 @@ const httpPort = 39151;
 const aisHostname = '127.0.0.1';
 const iasPort = 3000;
 
+var gpsModel = {};
 var targets = {};
 var aisSession = {};
 
-// $PVSP,DEVINFO,5.20.17443,XB6000H,NF14133,AI,05853001,3,2,7,,*2E..
-// 5.20.17443 = connectedDeviceTxVersion
-// XB6000H = connectedDeviceType
-// NF14133 = connectedDeviceSerialNumber
+// for testing:
+//targets['111111111'] = {
+//        mmsi: '111111111',
+//        lat: 37.5,
+//        lon: -76.3,
+//        cog: 297,
+//        sog: 10,
+//};
 
+// the mobile app is picky about the model number and version numbers
+// you dont get all functionality unless you provide valid values
+// serial number does not seem to matter
 var aisDeviceModel = {
-	connectedDeviceType: 'vesper-watchmate-mobile-app-broker',
-	connectedDeviceUiVersion: '---',
-	connectedDeviceTxVersion: '---',
-	connectedDeviceTxBbVersion: '---',
-	connectedDeviceSerialNumber: '---'
-
-// connectedDeviceType: 'XB-8000',
-// connectedDeviceUiVersion: '3.04.17316',
-// connectedDeviceTxVersion: '5.20.17443',
-// connectedDeviceTxBbVersion: '1.2.4.0',
-// connectedDeviceSerialNumber: 'KW37070'
+ connectedDeviceType: 'XB-8000',
+ connectedDeviceUiVersion: '3.04.17316',
+ connectedDeviceTxVersion: '5.20.17443',
+ connectedDeviceTxBbVersion: '1.2.4.0',
+ connectedDeviceSerialNumber: '----'
 };
 
 // NEED SAMPLES OF:
 
 // GET /datamodel/getModel?AnchorWatch
-// GET /v3/openChannel
-// GET /prefs/start_notifying
-// GET /v3/subscribeChannel?Sensors
-// GET /v3/subscribeChannel?HeartBeat
-// GET /v3/subscribeChannel?AnchorWatch
-// GET /v3/subscribeChannel?AnchorWatchControl
-// GET /v3/subscribeChannel?VesselPositionUnderway
-// GET /v3/subscribeChannel?VesselPositionHistory
+// GET /v3/openChannel - spins...
+// GET /v3/subscribeChannel?Sensors - 404
+// GET /v3/subscribeChannel?HeartBeat - 404
+// GET /v3/subscribeChannel?AnchorWatch - 404
+// GET /v3/subscribeChannel?AnchorWatchControl - 404
+// GET /v3/subscribeChannel?VesselPositionUnderway - 404
+// GET /v3/subscribeChannel?VesselPositionHistory - 404
 // GET /alarms/mute_alarm
 // TCP Server Received:$PVSP,KDGST,S*19
 // TCP Server Received:$PVSP,QNEMOELEMS*23
@@ -83,12 +88,16 @@ var aisDeviceModel = {
 
 // GET /v3/watchMate/collisionProfiles
 
-// GET /datamodel/getModel?OwnStaticData
-// OwnStaticData.vesselType
-// OwnStaticData.mmsi
-// OwnStaticData.name
-// OwnStaticData.callSign
+var collisionProfiles;
 
+collisionProfiles = getCollisionProfiles('collisionProfiles.json');
+
+// if it failed to load, try load the backup/original copy
+if (!collisionProfiles) {
+    collisionProfiles = getCollisionProfiles('collisionProfiles-original.json');
+}
+
+saveCollisionProfiles();
 
 function getDeviceModelXml() {
 	var xml = 
@@ -105,13 +114,6 @@ function getDeviceModelXml() {
 	return xml;
 }
 
-var gpsModel = {
-    latitudeText: 'N 00° 00.0000',
-    longitudeText: 'E 000° 00.0000',
-    COG: '000',
-    SOG: '0.0'
-};
-
 // FIXME: check if we can use hasGPS=0 while there is no fix
 // so that we don't send any other gps data until we have a fix
 
@@ -123,12 +125,12 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <GPSModel>
 <hasGPS>1</hasGPS>
-<latitudeText>${gpsModel.latitudeText||''}</latitudeText>
-<longitudeText>${gpsModel.longitudeText||''}</longitudeText>
+<latitudeText>${formatLat(gpsModel.lat)}</latitudeText>
+<longitudeText>${formatLon(gpsModel.lon)}</longitudeText>
 <COG>${formatCog(gpsModel.cog)}</COG>
 <SOG>${formatSog(gpsModel.sog)}</SOG>
 <HDGT>${formatCog(gpsModel.hdg)}</HDGT>
-<magvar>${gpsModel.magvar||''}</magvar>
+<magvar>${formatMagvar(gpsModel.magvar)}</magvar>
 <hasBowPosition>0</hasBowPosition>
 <sim>stop</sim>
 </GPSModel>
@@ -147,12 +149,12 @@ function getGpsModelAdvancedXml() {
 <Watchmate version='1.0' priority='0'>
 <GPSModel>
 <hasGPS>1</hasGPS>
-<latitudeText>${gpsModel.latitudeText||''}</latitudeText>
-<longitudeText>${gpsModel.longitudeText||''}</longitudeText>
+<latitudeText>${formatLat(gpsModel.lat)}</latitudeText>
+<longitudeText>${formatLon(gpsModel.lon)}</longitudeText>
 <COG>${formatCog(gpsModel.cog)}</COG>
 <SOG>${formatSog(gpsModel.sog)}</SOG>
 <HDGT>${formatCog(gpsModel.hdg)}</HDGT>
-<magvar>${gpsModel.magvar||''}</magvar>
+<magvar>${formatMagvar(gpsModel.magvar)}</magvar>
 <hasBowPosition>0</hasBowPosition>
 <sim>stop</sim>
 <Fix>
@@ -285,20 +287,55 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 // <anchorLatitude>39.951</anchorLatitude>
 // <anchorLongitude>-75.14</anchorLongitude>
 
+//<?xml version='1.0' encoding='ISO-8859-1' ?>
+//<Watchmate version='1.0' priority='0'>
+//<AnchorWatch>
+//<setAnchor>0</setAnchor>
+//<alarmRadius>30</alarmRadius>
+//<alarmsEnabled></alarmsEnabled>
+//<anchorLatitude></anchorLatitude>
+//<anchorLongitude></anchorLongitude>
+//<anchorCorrectedLat></anchorCorrectedLat>
+//<anchorCorrectedLong></anchorCorrectedLong>
+//<usingCorrected></usingCorrected>
+//<distanceToAnchor></distanceToAnchor>
+//<bearingToAnchor></bearingToAnchor>
+//<alarmTriggered></alarmTriggered>
+//</AnchorWatch>
+//</Watchmate>
+
+
+
 function getAnchorWatchModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
-<Watchmate version='1.0' priority='1'>
+<Watchmate version='1.0' priority='0'>
 <AnchorWatch>
-<setAnchor>1</setAnchor>
+<setAnchor>0</setAnchor>
 <alarmRadius>30</alarmRadius>
-<magneticOrTrueBearing>T</magneticOrTrueBearing>
-<alarmsEnabled>0</alarmsEnabled>
-<anchorLatitude>39.956</anchorLatitude>
-<anchorLongitude>-75.145</anchorLongitude>
-<outOfBounds>0</outOfBounds>
-<usingCorrected>0</usingCorrected>
+<alarmsEnabled></alarmsEnabled>
+<anchorLatitude></anchorLatitude>
+<anchorLongitude></anchorLongitude>
+<anchorCorrectedLat></anchorCorrectedLat>
+<anchorCorrectedLong></anchorCorrectedLong>
+<usingCorrected></usingCorrected>
+<distanceToAnchor></distanceToAnchor>
+<bearingToAnchor></bearingToAnchor>
+<alarmTriggered></alarmTriggered>
 </AnchorWatch>
 </Watchmate>`;
+}
+
+function getOwnStaticDataXml() {
+return `<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+<OwnStaticData>
+<MMSI>367756720</MMSI>
+<Name>MERRY</Name>
+<CallSign></CallSign>
+<VesselType>36</VesselType>
+<VesselSize a='1' b='2' c='3' d='4'/>
+</OwnStaticData>
+</Watchmate>`;    
 }
 
 function getPreferencesXml() {
@@ -306,10 +343,10 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <Prefs>
 <PrefsRequested>
-{2,{"accept.demo_mode",""},{"profile.current",""}}
+{2,{"accept.demo_mode",""},{"profile.current","${collisionProfiles.current.toUpperCase()}"}}
 </PrefsRequested>
 <Pref prefname='accept.demo_mode'>0</Pref>
-<Pref prefname='profile.current'>ANCHOR</Pref>
+<Pref prefname='profile.current'>${collisionProfiles.current.toUpperCase()}</Pref>
 </Prefs>
 </Watchmate>`;
 }
@@ -317,7 +354,8 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 function getAlarmsXml() {
     var response = 
 `<?xml version='1.0' encoding='ISO-8859-1' ?>
-<Watchmate version='1.0' priority='1'>`;    
+<Watchmate version='1.0' priority='1'>
+`;    
 
     for (var mmsi in targets) {
         var target = targets[mmsi];
@@ -331,8 +369,9 @@ function getAlarmsXml() {
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
 <Range>${formatRange(target.range)}</Range>
 <BearingTrue>${target.bearing||''}</BearingTrue>
-<TargetType></TargetType>
-</Alarm>`;
+<TargetType>1</TargetType>
+</Alarm>
+`;
         }
     }
 
@@ -356,7 +395,8 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 function getTargetsXml() {
     var response = 
 `<?xml version='1.0' encoding='ISO-8859-1' ?>
-<Watchmate version='1.0' priority='0'>`;	
+<Watchmate version='1.0' priority='0'>
+`;	
 
     for (var mmsi in targets) {
 	var target = targets[mmsi];
@@ -378,7 +418,8 @@ function getTargetsXml() {
 <DangerState>${target.dangerState||''}</DangerState>
 <AlarmType>${target.alarmType||''}</AlarmType>
 <FilteredState>${target.filteredState||''}</FilteredState>
-</Target>`;
+</Target>
+`;
     }
 
     response += '</Watchmate>';
@@ -388,7 +429,8 @@ function getTargetsXml() {
 function getTargetDetails(mmsi) {
     var response = 
 `<?xml version='1.0' encoding='ISO-8859-1' ?>
-<Watchmate version='1.0' priority='0'>`;	
+<Watchmate version='1.0' priority='0'>
+`;	
 
     var target = targets[mmsi];
 
@@ -400,16 +442,16 @@ function getTargetDetails(mmsi) {
 <HDG>${formatCog(target.hdg)}</HDG>
 <ROT></ROT>
 <Altitude>-1</Altitude>
-<LatitudeText>${target.latitudeText||''}</LatitudeText>
-<LongitudeText>${target.longitudeText||''}</LongitudeText>
+<latitudeText>${formatLat(target.lat)}</latitudeText>
+<longitudeText>${formatLon(target.lon)}</longitudeText>
 <OffPosition>0</OffPosition>
-<Virtual>1</Virtual>
+<Virtual>0</Virtual>
 <Dimensions>---</Dimensions>
 <Draft>---</Draft>
 <ClassType>${target.classType||''}</ClassType>
 <Destination></Destination>
 <ETAText></ETAText>
-<NavStatus>${target.navStatus||''}</NavStatus>
+<NavStatus>${target.navstatus||''}</NavStatus>
 <MMSI>${mmsi||''}</MMSI>
 <Name>${target.name||''}</Name>
 <CallSign>${target.callsign||''}</CallSign> 
@@ -426,24 +468,37 @@ function getTargetDetails(mmsi) {
 <DangerState>${target.dangerState||''}</DangerState>
 <AlarmType>${target.alarmType||''}</AlarmType>
 <FilteredState>${target.filteredState||''}</FilteredState>
-</Target>`;
+</Target>
+`;
     }
 
     response += '</Watchmate>';
     return response;
 }
 
+function getCollisionProfilesJson() {
+  return JSON.stringify(collisionProfiles,null,2);
+}
+
+
 // ======================= HTTP SERVER ========================
 // listens to requests from mobile app
 
 // log all requests
 app.use(function(req, res, next) {
-	console.info(`${req.method} ${req.originalUrl}`);
+    // this request is just way too freq. like 20/second!
+    if (req.originalUrl !== '/alarms/get_current_list') {
+        console.info(`${req.method} ${req.originalUrl}`);
+    }
 	// express.js automatically adds utf-8 encoding to everything. this
 	// overrides that. the watchmate mobile app cannot deal with utf-8.
-	res.setHeader('Content-Type', 'text/xml; charset=ISO-8859-1');
+    //res.setHeader('Content-Type', 'text/xml; charset=ISO-8859-1');
+    res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
 	next();
 });
+
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
 // sanity
 app.get('/', (req, res) => res.send('Hello World!'));
@@ -451,7 +506,7 @@ app.get('/', (req, res) => res.send('Hello World!'));
 // GET /datamodel/getModel?*****
 app.get('/datamodel/getModel', (req, res) => {
 
-    console.log(req.query);
+    //console.log(req.query);
     
     // GET /datamodel/getModel?DeviceModel
     if (req.query.DeviceModel==='') {
@@ -477,15 +532,31 @@ app.get('/datamodel/getModel', (req, res) => {
     else if (req.query.AnchorWatch==='') {
     	res.send( new Buffer(getAnchorWatchModelXml(),'latin1') );
     } 
+
+    // GET /datamodel/getModel?OwnStaticData
+    else if (req.query.OwnStaticData==='') {
+        res.send( new Buffer(getOwnStaticDataXml(),'latin1') );
+    }
     
-    
-    // 404
+    // FIXME: add 
+    // drop anchor / turn anchor watch on:
+    // GET /datamodel/propertyEdited?AnchorWatch.setAnchor=1
+    // then check: /datamodel/getModel?AnchorWatch
+    // change anchor watch radius
+    // GET /datamodel/propertyEdited?AnchorWatch.alarmRadius=38
+    // weigh anchor / turn anchor watch off:
+    // GET /datamodel/propertyEdited?AnchorWatch.setAnchor=0
+
+
+    // everything else gets a 404
     else {
-    	res.set('Content-Type', 'text/xml');
-    	var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
-    		<Watchmate version='1.0' priority='0'>
-    		</Watchmate>`; 
-    	res.send( new Buffer(xml,'latin1') );
+// res.set('Content-Type', 'text/xml');
+// var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
+// <Watchmate version='1.0' priority='0'>
+// </Watchmate>`;
+// res.send( new Buffer(xml,'latin1') );
+        console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
+        res.sendStatus(404);
     }
 
 });
@@ -493,6 +564,20 @@ app.get('/datamodel/getModel', (req, res) => {
 // GET /prefs/getPreferences?accept.demo_mode&profile.current
 app.get('/prefs/getPreferences', (req, res) => {
     res.send( new Buffer(getPreferencesXml(),'latin1') );
+});
+
+//GET /prefs/setPreferences?profile.current=OFFSHORE
+app.get('/prefs/setPreferences', (req, res) => {
+    if (req.query["profile.current"]) {
+        collisionProfiles.current = req.query["profile.current"].toLowerCase();
+        saveCollisionProfiles();
+        res.send( new Buffer(getPreferencesXml(),'latin1') );
+    }
+    
+    else {
+        console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
+        res.sendStatus(404);
+    }
 });
 
 // GET /alarms/get_current_list
@@ -516,16 +601,39 @@ app.get('/targets/getTargetDetails', (req, res) => {
     res.send( new Buffer(getTargetDetails(mmsi),'latin1') );
 });
 
-// catchall
-app.get('*', function(req, res) {
-    // res.set('Content-Type', 'text/xml');
-    var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
-    	<Watchmate version='1.0' priority='0'>
-    	</Watchmate>`; 
-    res.send( new Buffer(xml,'latin1') );
+// GET /v3/watchMate/collisionProfiles
+app.get('/v3/watchMate/collisionProfiles', (req, res) => {
+    res.send( new Buffer(getCollisionProfilesJson(),'latin1') );
 });
 
-app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort}!`))
+//PUT /v3/watchMate/collisionProfiles
+app.put('/v3/watchMate/collisionProfiles', (req, res) => {
+    //console.log(req.body);
+    // the body is already parsed to json by express
+    collisionProfiles = req.body;
+    saveCollisionProfiles();
+    res.sendStatus(204);
+});
+
+// GET /prefs/start_notifying - "Hello" 200 text/html
+app.get('/prefs/start_notifying', (req, res) => {
+    res.send( new Buffer('Hello','latin1') );
+});
+
+
+
+// everything else gets a 404
+app.get('*', function(req, res) {
+// res.set('Content-Type', 'text/xml');
+// var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
+// <Watchmate version='1.0' priority='0'>
+// </Watchmate>`;
+// res.send( new Buffer(xml,'latin1') );
+    console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
+    res.sendStatus(404);
+});
+
+app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort}!`));
 
 // ======================= TCP SERVER ========================
 // listens to requests from mobile app
@@ -550,17 +658,87 @@ tcpServer.on('connection', function(socket) {
     // what it perceives as lost connectivity with the AIS unit. The app does
     // not actually appear to use this data though - instead relying on getting
     // everything it needs from the web interfaces.
+    
+    // FIXME: I think this results in separate interval functions for each
+    // client that connects to this tcp listener... which is nuts
+    
     var timerId = setInterval(function(){
- var data =
- `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
- $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
- $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
- $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
- $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
- $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
- $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
- socket.write(data);
- }, 4000);
+        console.log('start tcp xmit');
+        
+        /*
+         * var data =
+         * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+         * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+         * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+         * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+         * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+         * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+         * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
+         * socket.write(data);
+         */
+
+        if (gpsModel.lat === undefined 
+                || gpsModel.lon === undefined
+                || gpsModel.sog === undefined
+                || gpsModel.cog === undefined) {
+            console.log('cant generate nmea gps message: missing data');
+            return;
+        } else {
+            //console.log('gpsModel',gpsModel);
+            // encode NMEA message
+            var nmeaMsg = new NmeaEncode({ 
+                // standard class B Position report
+                // msgtype : 18, <== NOTE: this breaks things!
+                lat        : gpsModel.lat,
+                lon        : gpsModel.lon,
+                cog        : gpsModel.cog,
+                sog        : gpsModel.sog
+            }); 
+            
+            //console.log(nmeaMsg,nmeaMsg.valid,nmeaMsg.nmea);
+            if (nmeaMsg.valid) socket.write(nmeaMsg.nmea + '\n');
+        }
+        
+        // FIXME should we send the proper ais class A vs B message ?
+        
+        for (var mmsi in targets) {
+            var target = targets[mmsi];
+
+            // encode AIS message
+            var encMsg = new AisEncode({
+                aistype    : 3,
+                mmsi       : target.mmsi,
+                lat: target.lat,
+                lon: target.lon,
+                cog: target.cog,
+                sog: target.sog,
+                navstatus: target.navstatus
+            }); 
+            
+            //console.log(encMsg,encMsg.valid,encMsg.nmea);
+            if (encMsg.valid) socket.write(encMsg.nmea + '\n');
+
+            // encode AIS message
+            var encMsg = new AisEncode ({
+                aistype    : 5,
+                mmsi       : target.mmsi,
+                callsign: target.callsign,
+                shipname: target.shipname,
+                cargo: target.cargo,
+            }); 
+            
+            //console.log(encMsg,encMsg.valid,encMsg.nmea);
+            if (encMsg.valid) socket.write(encMsg.nmea + '\n');
+        }
+        
+    }, 4000);
+    
+    socket.on('error', function(err) {
+        console.log('woops',err);
+        console.error;
+    });
+
+
 
     socket.on('data', function(data) {
         var string = (data.toString());
@@ -613,110 +791,37 @@ function connect() {
 
 function processReceivedAisData(data) {
     var dataString = data.toString('latin1');
+    // split on carriage returns and lines feeds
     var lines = dataString.split(/\r\n|\r|\n/g);
     
     for (var line of lines) {
-	processAIScommand(line);
+        processAIScommand(line);
     }
 }
 
 function processAIScommand(line) {
     
-    console.log('processAIScommand',line);
+    //console.log('processAIScommand',line);
 
     // decode and AIS message
     if (line.startsWith('!AI')) { 
         var decMsg = new AisDecode (line, aisSession);
-        console.log ('%j', decMsg);
-        
-        // !AIVDM,1,1,,A,H39WO5PpE8EE>0TT00000000000,2*28
-        // User ID (MMSI) 211410710
-        // Name NEREUS II@@@@@@@@@@@
-        // {
-        // "bitarray":[152,131,137,167,159,133,160,184,149,136,149,149,142,128,164,164,128,128,128,128,128,128,128,128,128,128,128],
-        // "valid":true,
-        // "error":"",
-        // "payload":{
-        // "type":"Buffer",
-        // "data":[72,51,57,87,79,53,80,112,69,56,69,69,62,48,84,84,48,48,48,48,48,48,48,48,48,48,48]
-        // },
-        // "msglen":27,
-        // "channel":"A",
-        // "aistype":24,
-        // "repeat":0,
-        // "immsi":211410710,
-        // "mmsi":"211410710",
-        // "class":"B",
-        // "part":0,
-        // "shipname":"NEREUS II"
-        // }
-        
-        // !AIVDM,1,1,,A,H39WO5TT@<CD9=?49>=j00000000,0*6D
-        // {
-        // "bitarray":[152,131,137,167,159,133,164,164,144,140,147,148,137,141,143,132,137,142,141,178,128,128,128,128,128,128,128,128],
-        // "valid":true,
-        // "error":"",
-        // "payload":{
-        // "type":"Buffer",
-        // "data":[72,51,57,87,79,53,84,84,64,60,67,68,57,61,63,52,57,62,61,106,48,48,48,48,48,48,48,48]},
-        // "msglen":28,
-        // "channel":"A",
-        // "aistype":24,
-        // "repeat":0,
-        // "immsi":211410710,
-        // "mmsi":"211410710",
-        // "class":"B",
-        // "part":1,
-        // "cargo":36,
-        // "callsign":"DINM2",
-        // "dimA":0,
-        // "dimB":0,
-        // "dimC":0,
-        // "dimD":0,
-        // "length":0,
-        // "width":0
-        // }
-        
-        // {
-        // "bitarray":[129,133,158,137,169,175,128,160,128,128,154,162,165,168,172,149,159,136,159,171,138,143,190,188,130,148,128,151],
-        // "valid":true,
-        // "error":"",
-        // "payload":{
-        // "type":"Buffer",
-        // "data":[49,53,78,57,97,103,48,80,48,48,74,82,85,96,100,69,79,56,79,99,58,63,118,116,50,68,48,71]
-        // },
-        // "msglen":28,
-        // "channel":"B",
-        // "aistype":1,
-        // "repeat":0,
-        // "immsi":367159740,
-        // "mmsi":"367159740",
-        // "class":"A",
-        // "navstatus":0,
-        // "lon":-76.33020333333333,
-        // "lat":37.55029,
-        // "rot":-128,
-        // "sog":0,
-        // "cog":285.6,
-        // "hdg":511,
-        // "utc":30,
-        // "smi":0
-        // }
-        
+        //console.log ('%j', decMsg);
+
         if (decMsg.valid && decMsg.mmsi) {
     	
     	var target = targets[decMsg.mmsi];
     	
-    	console.log('target',target);
+    	//console.log('target',target);
     	
     	if (!target) {
     	    target = {};
     	}
 
-	target.mmsi = decMsg.mmsi;
-	target.lastSeen = new Date().toISOString();
+    	target.mmsi = decMsg.mmsi;
+    	target.lastSeen = new Date().toISOString();
 
-    	console.log('target',target);
+    	//console.log('target',target);
 
     	if (decMsg.shipname !== undefined) {
     	    target.name = decMsg.shipname;
@@ -725,15 +830,14 @@ function processAIScommand(line) {
     	if (decMsg.lat !== undefined) {
     	    target.lat = decMsg.lat;
     	    target.lon = decMsg.lon;
-    	    target.latitudeText = formatLat(decMsg.lat);
-    	    target.longitudeText = formatLon(decMsg.lon);
     	}
     	
         if (decMsg.cog !== undefined) {
             target.cog = decMsg.cog;
         }
 
-        if (decMsg.hdg !== undefined) {
+        // NOTE: hdg=511 is a default value that indicates heading is not available
+        if (decMsg.hdg !== undefined && decMsg.hdg<=360) {
             target.hdg = decMsg.hdg;
         }
 
@@ -750,7 +854,7 @@ function processAIScommand(line) {
         // 0: "Under way using engine",
         // 1: "At anchor"
         if (decMsg.navstatus !== undefined) {
-            target.navStatus = decMsg.navstatus;
+            target.navstatus = decMsg.navstatus;
         }
 		    
         // <ClassType>ATON</ClassType>
@@ -766,8 +870,8 @@ function processAIScommand(line) {
 
     	targets[decMsg.mmsi] = target;
 
-    	console.log('target',target);
-    	console.log('targets',targets);
+    	//console.log('target',target);
+    	//console.log('targets',targets);
 
         }
 
@@ -776,39 +880,15 @@ function processAIScommand(line) {
     // decode NMEA message
     if (line.startsWith('$GP')) {
         var decMsg = new NmeaDecode (line);
-        console.log ('%j', decMsg);
+        //console.log ('%j', decMsg);
         
-        // {
-        // "nmea":["$GPRMC","203901.00","A","3732.59922","N","07619.93996","W","0.018","77.90","201018","10.96","W","A*3D\n"],
-        // "valid":true,
-        // "cmd":2,
-        // "mssi":0,
-        // "time":"203901.00",
-        // "lat":37.543320333333334,
-        // "lon":-76.33233266666666,
-        // "sog":0,
-        // "cog":77.9,
-        // "day":"201018",
-        // "alt":10.96,
-        // "date":1603053541000
-        // }
-
-        // var gpsModel = {
-        // latitudeText: 'N 39° 57.0689',
-        // longitudeText: 'W 075° 08.3692',
-        // COG: '090',
-        // SOG: '0.0'
-        // };
-		
 	    // FIXME: add GPS accuracy and satellite data... meh
 		
         if (decMsg.valid) {
             if (decMsg.lat !== undefined) {
             	gpsModel.lat = decMsg.lat;
             	gpsModel.lon = decMsg.lon;
-            	gpsModel.latitudeText = formatLat(decMsg.lat);
-            	gpsModel.longitudeText = formatLon(decMsg.lon);
-            	gpsModel.magvar = Magvar.Get(gpsModel.lat, gpsModel.lon).toFixed(2);
+            	gpsModel.magvar = Magvar.Get(gpsModel.lat, gpsModel.lon);
             }
 	
             if (decMsg.cog !== undefined) {
@@ -819,7 +899,7 @@ function processAIScommand(line) {
                 gpsModel.sog = decMsg.sog;
             }
 
-            console.log('gpsModel',gpsModel);
+            //console.log('gpsModel',gpsModel);
         }
         
     }
@@ -887,11 +967,17 @@ setInterval(updateAllTargets, 5000);
 function updateAllTargets() {
     for (var mmsi in targets) {
     	var target = targets[mmsi];
-    	// FIXME: age out old targets
-    	ageOutOldTargets(target);
-    	calculateRangeAndBearing(target);
-    	updateCpa(target);
-    	evaluateAlarms(target);
+    	var targetDeleted = false;
+
+    	if (ageOldTargets) {
+    	    targetDeleted = ageOutOldTargets(target);
+    	}
+
+    	if (!targetDeleted) {
+            calculateRangeAndBearing(target);
+            updateCpa(target);
+            evaluateAlarms(target);
+    	}
     }
 }
 
@@ -899,6 +985,7 @@ function ageOutOldTargets(target) {
     if ( (new Date() - new Date(target.lastSeen))/1000/60 > ageOldTargetsTTL ) {
         console.log('deleting',target.mmsi,target.lastSeen,new Date().toISOString());
         delete targets[target.mmsi];
+        return true;
     }
 }
 
@@ -970,19 +1057,36 @@ function evaluateAlarms(target) {
     // <FilteredState>show</FilteredState>
     
     // guard alarm
-    target.guardAlarm = (target.range<2 && target.sog>1);
+    target.guardAlarm = (
+            target.range < collisionProfiles[collisionProfiles.current].guard.range 
+            && target.sog > collisionProfiles[collisionProfiles.current].guard.speed
+    );
     
     // collision alarm
-    target.collisionAlarm = (target.cpa<0.1 && target.tcpa<300 && target.sog>3);
+    target.collisionAlarm = (
+            target.cpa < collisionProfiles[collisionProfiles.current].danger.cpa
+            && target.tcpa > 0
+            && target.tcpa < collisionProfiles[collisionProfiles.current].danger.tcpa 
+            && target.sog > collisionProfiles[collisionProfiles.current].danger.speed
+    );
         
     // collision warning
-    target.collisionWarning = (target.cpa<0.5 && target.tcpa<600 && target.sog>0.5);
+    target.collisionWarning = (
+            target.cpa < collisionProfiles[collisionProfiles.current].warning.cpa
+            && target.tcpa > 0
+            && target.tcpa < collisionProfiles[collisionProfiles.current].warning.tcpa 
+            && target.sog > collisionProfiles[collisionProfiles.current].warning.speed
+    );
+    
+    var order = 36862;
 
     if (target.guardAlarm || target.collisionAlarm) {
         target.dangerState = 'danger';
+        order = 8190;
     }
     else if (target.collisionWarning) {
         target.dangerState = 'warning';
+        order = 16382;
     }
     else {
         target.dangerState = undefined;
@@ -1000,34 +1104,28 @@ function evaluateAlarms(target) {
     
     target.alarmType = alarmType ? alarmType : undefined;
 
-    var order = 10000;
-    
     if (target.dangerState) {
-        order -= 5000;
         target.filteredState = 'show';
     }
     else {
         target.filteredState = 'hide';
     }
 
-    if (target.tcpa) {
+    if (target.tcpa > 0) {
         // tcpa of 0 seconds reduces order by 1000 (this is an arbitrary
         // weighting)
         // tcpa of 60 minutes reduces order by 0
-        order -= (1000 - 1000/3600*(target.tcpa<0 ? 0 : target.tcpa));
+        var weight = 1000;
+        order -= (weight - weight/3600*target.tcpa);
     }
 
-    if (target.cpa) {
+    if (target.cpa > 0) {
         // cpa of 0 nm reduces order by 2000 (this is an arbitrary weighting)
         // cpa of 5 nm reduces order by 0
-        order -= (1000 - 2000/5*(target.cpa<0 ? 0 : target.cpa));
+        var weight = 2000;
+        order -= (weight - weight/5*target.cpa);
     }
 
-    if (target.sog) {
-        // sog of 15 knots reduces order by 45 (this is an arbitrary weighting)
-        order -= 3*target.sog;
-    }
-    
     target.order = Math.round(order);
 
 }
@@ -1038,6 +1136,10 @@ function formatCog(cog) {
 
 function formatSog(sog) {
     return sog === undefined ? '' : sog.toFixed(1);    
+}
+
+function formatMagvar(magvar) {
+    return magvar === undefined ? '' : magvar.toFixed(2);
 }
 
 function formatCpa(cpa) {
@@ -1053,13 +1155,45 @@ function formatTcpa(tcpa) {
     if (tcpa === undefined) {
         return '';
     } else if (Math.abs(tcpa)>=3600) {
-        return new Date(1000 * Math.abs(tcpa)).toISOString().substr(11,8)
+        return (tcpa<0 ? '-' : '') + new Date(1000 * Math.abs(tcpa)).toISOString().substr(11,8)
     } else {
-        return new Date(1000 * Math.abs(tcpa)).toISOString().substr(14,5)
+        return (tcpa<0 ? '-' : '') + new Date(1000 * Math.abs(tcpa)).toISOString().substr(14,5)
     }
 }
 
 function formatRange(range) {
     return range === undefined ? '' : range.toFixed(2);
+}
+
+function getCollisionProfiles(filename) {
+    var myObj;
+    try {
+        var data = fs.readFileSync(`./${filename}`);
+        myObj = JSON.parse(data);
+        //console.dir(myObj);
+    }
+    catch (err) {
+        console.log('There has been an error parsing your JSON.')
+        console.log(err.message);
+    }
+    return myObj;
+}
+
+function saveCollisionProfiles() {
+    try {
+        var data = JSON.stringify(collisionProfiles);
+        fs.writeFile('./collisionProfiles.json', data, function (err) {
+            if (err) {
+                console.log('There has been an error saving your configuration data.');
+                console.log(err.message);
+                return;
+            }
+            console.log('Configuration saved successfully.')
+        });
+    }
+    catch (err) {
+        console.log('There has been an error saving your configuration data.')
+        console.log(err.message);
+    }
 }
 

@@ -1,21 +1,19 @@
 {
-  "name": "node",
+  "name": "Vesper WatchMate Mobile App Broker",
   "version": "1.0.0",
-  "description": "",
+  "description": "Use the Vesper WatchMate mobile app with any AIS transponder",
   "main": "app.js",
   "dependencies": {
     "express": "^4.16.4",
     "geolib": "^2.0.24",
     "ggencoder": "^1.0.2",
     "lethexa-motionpredict": "^0.4.1",
-    "magvar": "^1.0.0",
-    "net-retry-connect": "^0.1.1",
-    "xml": "^1.0.1"
+    "magvar": "^1.0.0"
   },
   "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Jeremy Waters",
   "license": "ISC"
 }
