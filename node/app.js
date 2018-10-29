@@ -48,15 +48,19 @@ const iasPort = 3000;
 var gpsModel = {};
 var targets = {};
 var aisSession = {};
+var anchorWatch = {
+        setAnchor: 0,
+        alarmRadius: 30
+};
 
 // for testing:
-//targets['111111111'] = {
-//        mmsi: '111111111',
-//        lat: 37.5,
-//        lon: -76.3,
-//        cog: 297,
-//        sog: 10,
-//};
+// targets['111111111'] = {
+// mmsi: '111111111',
+// lat: 37.5,
+// lon: -76.3,
+// cog: 297,
+// sog: 10,
+// };
 
 // the mobile app is picky about the model number and version numbers
 // you dont get all functionality unless you provide valid values
@@ -287,22 +291,22 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 // <anchorLatitude>39.951</anchorLatitude>
 // <anchorLongitude>-75.14</anchorLongitude>
 
-//<?xml version='1.0' encoding='ISO-8859-1' ?>
-//<Watchmate version='1.0' priority='0'>
-//<AnchorWatch>
-//<setAnchor>0</setAnchor>
-//<alarmRadius>30</alarmRadius>
-//<alarmsEnabled></alarmsEnabled>
-//<anchorLatitude></anchorLatitude>
-//<anchorLongitude></anchorLongitude>
-//<anchorCorrectedLat></anchorCorrectedLat>
-//<anchorCorrectedLong></anchorCorrectedLong>
-//<usingCorrected></usingCorrected>
-//<distanceToAnchor></distanceToAnchor>
-//<bearingToAnchor></bearingToAnchor>
-//<alarmTriggered></alarmTriggered>
-//</AnchorWatch>
-//</Watchmate>
+// <?xml version='1.0' encoding='ISO-8859-1' ?>
+// <Watchmate version='1.0' priority='0'>
+// <AnchorWatch>
+// <setAnchor>0</setAnchor>
+// <alarmRadius>30</alarmRadius>
+// <alarmsEnabled></alarmsEnabled>
+// <anchorLatitude></anchorLatitude>
+// <anchorLongitude></anchorLongitude>
+// <anchorCorrectedLat></anchorCorrectedLat>
+// <anchorCorrectedLong></anchorCorrectedLong>
+// <usingCorrected></usingCorrected>
+// <distanceToAnchor></distanceToAnchor>
+// <bearingToAnchor></bearingToAnchor>
+// <alarmTriggered></alarmTriggered>
+// </AnchorWatch>
+// </Watchmate>
 
 
 
@@ -310,17 +314,17 @@ function getAnchorWatchModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <AnchorWatch>
-<setAnchor>0</setAnchor>
-<alarmRadius>30</alarmRadius>
-<alarmsEnabled></alarmsEnabled>
-<anchorLatitude></anchorLatitude>
-<anchorLongitude></anchorLongitude>
+<setAnchor>${anchorWatch.setAnchor}</setAnchor>
+<alarmRadius>${anchorWatch.alarmRadius}</alarmRadius>
+<alarmsEnabled>${anchorWatch.setAnchor}</alarmsEnabled>
+<anchorLatitude>${anchorWatch.anchorLatitude||''}</anchorLatitude>
+<anchorLongitude>${anchorWatch.anchorLongitude||''}</anchorLongitude>
 <anchorCorrectedLat></anchorCorrectedLat>
 <anchorCorrectedLong></anchorCorrectedLong>
-<usingCorrected></usingCorrected>
-<distanceToAnchor></distanceToAnchor>
-<bearingToAnchor></bearingToAnchor>
-<alarmTriggered></alarmTriggered>
+<usingCorrected>0</usingCorrected>
+<distanceToAnchor>3</distanceToAnchor>
+<bearingToAnchor>123</bearingToAnchor>
+<alarmTriggered>0</alarmTriggered>
 </AnchorWatch>
 </Watchmate>`;
 }
@@ -329,8 +333,8 @@ function getOwnStaticDataXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <OwnStaticData>
-<MMSI>367756720</MMSI>
-<Name>MERRY</Name>
+<MMSI>111111111</MMSI>
+<Name>UNKNOWN</Name>
 <CallSign></CallSign>
 <VesselType>36</VesselType>
 <VesselSize a='1' b='2' c='3' d='4'/>
@@ -407,7 +411,7 @@ function getTargetsXml() {
 <CallSign>${target.callsign||''}</CallSign> 
 <VesselTypeString>${target.VesselTypeString||''}</VesselTypeString>
 <VesselType>${target.VesselType||''}</VesselType>
-<TargetType>1</TargetType>
+<TargetType>${target.targetType||''}</TargetType>
 <Order>${target.order||''}</Order>
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
 <CPA>${formatCpa(target.cpa)}</CPA>
@@ -457,7 +461,7 @@ function getTargetDetails(mmsi) {
 <CallSign>${target.callsign||''}</CallSign> 
 <VesselTypeString>${target.VesselTypeString||''}</VesselTypeString>
 <VesselType>${target.VesselType||''}</VesselType>
-<TargetType>1</TargetType>
+<TargetType>${target.targetType||''}</TargetType>
 <Order>${target.order||''}</Order>
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
 <CPA>${formatCpa(target.cpa)}</CPA>
@@ -492,7 +496,7 @@ app.use(function(req, res, next) {
     }
 	// express.js automatically adds utf-8 encoding to everything. this
 	// overrides that. the watchmate mobile app cannot deal with utf-8.
-    //res.setHeader('Content-Type', 'text/xml; charset=ISO-8859-1');
+    // res.setHeader('Content-Type', 'text/xml; charset=ISO-8859-1');
     res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
 	next();
 });
@@ -506,7 +510,7 @@ app.get('/', (req, res) => res.send('Hello World!'));
 // GET /datamodel/getModel?*****
 app.get('/datamodel/getModel', (req, res) => {
 
-    //console.log(req.query);
+    // console.log(req.query);
     
     // GET /datamodel/getModel?DeviceModel
     if (req.query.DeviceModel==='') {
@@ -538,16 +542,6 @@ app.get('/datamodel/getModel', (req, res) => {
         res.send( new Buffer(getOwnStaticDataXml(),'latin1') );
     }
     
-    // FIXME: add 
-    // drop anchor / turn anchor watch on:
-    // GET /datamodel/propertyEdited?AnchorWatch.setAnchor=1
-    // then check: /datamodel/getModel?AnchorWatch
-    // change anchor watch radius
-    // GET /datamodel/propertyEdited?AnchorWatch.alarmRadius=38
-    // weigh anchor / turn anchor watch off:
-    // GET /datamodel/propertyEdited?AnchorWatch.setAnchor=0
-
-
     // everything else gets a 404
     else {
 // res.set('Content-Type', 'text/xml');
@@ -566,7 +560,7 @@ app.get('/prefs/getPreferences', (req, res) => {
     res.send( new Buffer(getPreferencesXml(),'latin1') );
 });
 
-//GET /prefs/setPreferences?profile.current=OFFSHORE
+// GET /prefs/setPreferences?profile.current=OFFSHORE
 app.get('/prefs/setPreferences', (req, res) => {
     if (req.query["profile.current"]) {
         collisionProfiles.current = req.query["profile.current"].toLowerCase();
@@ -606,9 +600,9 @@ app.get('/v3/watchMate/collisionProfiles', (req, res) => {
     res.send( new Buffer(getCollisionProfilesJson(),'latin1') );
 });
 
-//PUT /v3/watchMate/collisionProfiles
+// PUT /v3/watchMate/collisionProfiles
 app.put('/v3/watchMate/collisionProfiles', (req, res) => {
-    //console.log(req.body);
+    // console.log(req.body);
     // the body is already parsed to json by express
     collisionProfiles = req.body;
     saveCollisionProfiles();
@@ -618,6 +612,39 @@ app.put('/v3/watchMate/collisionProfiles', (req, res) => {
 // GET /prefs/start_notifying - "Hello" 200 text/html
 app.get('/prefs/start_notifying', (req, res) => {
     res.send( new Buffer('Hello','latin1') );
+});
+
+// FIXME: add
+// drop anchor / turn anchor watch on:
+// GET /datamodel/propertyEdited?AnchorWatch.setAnchor=1
+// then check: /datamodel/getModel?AnchorWatch
+// change anchor watch radius
+// GET /datamodel/propertyEdited?AnchorWatch.alarmRadius=38
+// weigh anchor / turn anchor watch off:
+// GET /datamodel/propertyEdited?AnchorWatch.setAnchor=0
+
+// GET /datamodel/propertyEdited?AnchorWatch.setAnchor=1
+app.get('/datamodel/propertyEdited', (req, res) => {
+    var setAnchor = req.query["AnchorWatch.setAnchor"];
+    
+    if (req.query["AnchorWatch.setAnchor"]) {
+        console.log('setting anchorWatch.setAnchor',req.query["AnchorWatch.setAnchor"]);
+        anchorWatch.setAnchor = req.query["AnchorWatch.setAnchor"];
+        anchorWatch.anchorLatitude = gpsModel.lat;
+        anchorWatch.anchorLongitude = gpsModel.lon;
+    }
+    
+    if (req.query["AnchorWatch.alarmsEnabled"]) {
+        console.log('setting anchorWatch.alarmsEnabled',req.query["AnchorWatch.alarmsEnabled"]);
+        anchorWatch.alarmsEnabled = req.query["AnchorWatch.alarmsEnabled"];
+    }
+    
+    if (req.query["AnchorWatch.alarmRadius"]) {
+        console.log('setting anchorWatch.alarmRadius',req.query["AnchorWatch.alarmRadius"]);
+        anchorWatch.alarmRadius = req.query["AnchorWatch.alarmRadius"];
+    }
+
+    res.sendStatus(200);
 });
 
 
@@ -638,152 +665,172 @@ app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort
 // ======================= TCP SERVER ========================
 // listens to requests from mobile app
 
-var tcpServer = net.createServer();
+var connectionNumber = 0;
+let connections = [];
 
-tcpServer.listen(tcpPort);
-console.log('TCP Server listening on ' + tcpServer.address().address +':'+ tcpServer.address().port);
-
-tcpServer.on('connection', function(socket) {
-    console.log('New TCP Server Connection: ' + socket.remoteAddress +':'+ socket.remotePort);
-
-    // $GPRMC = Recommended minimum specific GPS/Transit data
-    // $GPVTG = Track Made Good and Ground Speed
-    // $GPGGA = Global Positioning System Fix Data
-    // $GPGSA = GPS DOP and active satellites
-    // $GPGSV = GPS Satellites in view
-    // $GPGLL = Geographic Position, Latitude / Longitude and time
-
-    // the app wants to see traffic on port 39150. if it does not, it will
-    // periodically reinitialize. i guess this is a mechanism to try and restore
-    // what it perceives as lost connectivity with the AIS unit. The app does
-    // not actually appear to use this data though - instead relying on getting
-    // everything it needs from the web interfaces.
+const tcpServer = net.createServer((connection) => {
     
-    // FIXME: I think this results in separate interval functions for each
-    // client that connects to this tcp listener... which is nuts
+    connectionNumber++;
+    console.log(`TCP Server: new connection ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
     
-    var timerId = setInterval(function(){
-        console.log('start tcp xmit');
-        
-        /*
-         * var data =
-         * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-         * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-         * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-         * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-         * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-         * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-         * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
-         * socket.write(data);
-         */
-
-        if (gpsModel.lat === undefined 
-                || gpsModel.lon === undefined
-                || gpsModel.sog === undefined
-                || gpsModel.cog === undefined) {
-            console.log('cant generate nmea gps message: missing data');
-            return;
-        } else {
-            //console.log('gpsModel',gpsModel);
-            // encode NMEA message
-            var nmeaMsg = new NmeaEncode({ 
-                // standard class B Position report
-                // msgtype : 18, <== NOTE: this breaks things!
-                lat        : gpsModel.lat,
-                lon        : gpsModel.lon,
-                cog        : gpsModel.cog,
-                sog        : gpsModel.sog
-            }); 
-            
-            //console.log(nmeaMsg,nmeaMsg.valid,nmeaMsg.nmea);
-            if (nmeaMsg.valid) socket.write(nmeaMsg.nmea + '\n');
-        }
-        
-        // FIXME should we send the proper ais class A vs B message ?
-        
-        for (var mmsi in targets) {
-            var target = targets[mmsi];
-
-            // encode AIS message
-            var encMsg = new AisEncode({
-                aistype    : 3,
-                mmsi       : target.mmsi,
-                lat: target.lat,
-                lon: target.lon,
-                cog: target.cog,
-                sog: target.sog,
-                navstatus: target.navstatus
-            }); 
-            
-            //console.log(encMsg,encMsg.valid,encMsg.nmea);
-            if (encMsg.valid) socket.write(encMsg.nmea + '\n');
-
-            // encode AIS message
-            var encMsg = new AisEncode ({
-                aistype    : 5,
-                mmsi       : target.mmsi,
-                callsign: target.callsign,
-                shipname: target.shipname,
-                cargo: target.cargo,
-            }); 
-            
-            //console.log(encMsg,encMsg.valid,encMsg.nmea);
-            if (encMsg.valid) socket.write(encMsg.nmea + '\n');
-        }
-        
-    }, 4000);
+    connection.id = connectionNumber;
+    connections.push(connection);
+    console.log('connections',connections.length);
     
-    socket.on('error', function(err) {
-        console.log('woops',err);
-        console.error;
+    connection.on('data', data => {
+        console.log(`TCP Server: connection DATA ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
     });
 
-
-
-    socket.on('data', function(data) {
-        var string = (data.toString());
-        console.log('TCP Server Received:' + string)
+//    connection.on('close', () => {
+//        console.log(`TCP Server: connection CLOSE ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+//        connections.splice(connections.indexOf(connection), 1);
+//        console.log('connections',connections.length);
+//    });
+    
+    connection.on('end', () => {
+        console.log(`TCP Server: connection END ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+        connections.splice(connections.indexOf(connection), 1);
+        console.log('connections',connections.length);
     });
-
-    socket.on('end', () => {
-	clearInterval(timerId);
-	console.log('TCP Server: client disconnected' + socket.remoteAddress +':'+ socket.remotePort);
-    });
-  
+    
 });
+
+tcpServer.on('error', (err) => {
+    console.log('TCP Server: whoops!');
+    throw err;
+});
+
+tcpServer.listen(tcpPort, () => {
+    console.log(`TCP Server: listening on ${tcpServer.address().address}:${tcpServer.address().port}`);
+});
+
+function broadcast(msg) {
+    connections.map(connection => {
+        connection.write(msg);
+    });
+}
+
+// $GPRMC = Recommended minimum specific GPS/Transit data
+// $GPVTG = Track Made Good and Ground Speed
+// $GPGGA = Global Positioning System Fix Data
+// $GPGSA = GPS DOP and active satellites
+// $GPGSV = GPS Satellites in view
+// $GPGLL = Geographic Position, Latitude / Longitude and time
+
+// the app wants to see traffic on port 39150. if it does not, it will
+// periodically reinitialize. i guess this is a mechanism to try and restore
+// what it perceives as lost connectivity with the AIS unit. The app does
+// not actually appear to use this data though - instead relying on getting
+// everything it needs from the web interfaces.
+
+setInterval(function(){
+    console.log('start tcp xmit');
+    
+    var message = '';
+    
+    /*
+     * var data =
+     * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+     * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+     * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+     * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+     * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+     * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+     * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
+     * socket.write(data);
+     */
+
+    if (gpsModel.lat === undefined 
+            || gpsModel.lon === undefined
+            || gpsModel.sog === undefined
+            || gpsModel.cog === undefined) {
+        console.log('cant generate nmea gps message: missing data');
+        return;
+    } else {
+        // console.log('gpsModel',gpsModel);
+        // encode NMEA message
+        var nmeaMsg = new NmeaEncode({ 
+            // standard class B Position report
+            // msgtype : 18, <== NOTE: this breaks things!
+            lat        : gpsModel.lat,
+            lon        : gpsModel.lon,
+            cog        : gpsModel.cog,
+            sog        : gpsModel.sog
+        }); 
+        
+        // console.log(nmeaMsg,nmeaMsg.valid,nmeaMsg.nmea);
+        if (nmeaMsg.valid) message += nmeaMsg.nmea + '\n';
+    }
+    
+    // FIXME should we send the proper ais class A vs B message ?
+    
+    for (var mmsi in targets) {
+        var target = targets[mmsi];
+
+        // encode AIS message
+        var encMsg = new AisEncode({
+            aistype    : 3,
+            mmsi       : target.mmsi,
+            lat: target.lat,
+            lon: target.lon,
+            cog: target.cog,
+            sog: target.sog,
+            navstatus: target.navstatus
+        }); 
+        
+        // console.log(encMsg,encMsg.valid,encMsg.nmea);
+        if (encMsg.valid) message += encMsg.nmea + '\n';
+
+        // encode AIS message
+        var encMsg = new AisEncode ({
+            aistype    : 5,
+            mmsi       : target.mmsi,
+            callsign: target.callsign,
+            shipname: target.shipname,
+            cargo: target.cargo,
+        }); 
+        
+        // console.log(encMsg,encMsg.valid,encMsg.nmea);
+        if (encMsg.valid) message += encMsg.nmea + '\n';
+    }
+    
+    broadcast(message);
+
+}, 4000);
+    
 
 // ======================= TCP CLIENT ========================
 // gets data from AIS
 
-let client = new net.Socket()
+let socket = new net.Socket()
 
 // FIXME: humm... ok
-client.setEncoding('latin1');
+socket.setEncoding('latin1');
 
 function connect() {
-    console.log("new client");
+    console.log("new socket");
     
-    client.connect(iasPort, aisHostname, () => {
+    socket.connect(iasPort, aisHostname, () => {
 	console.log("Connected")
-        // client.write("Hello, server! Love, Client.")
+        // socket.write("Hello, server! Love, socket.")
     });
 
-    client.on("data", data => {
+    socket.on("data", data => {
         console.log("Received: " + data);
         processReceivedAisData(data);
     });
 
-    client.on("close", () => {
+    socket.on("close", () => {
         console.log("Connection closed")
         reconnect()
     });
 
-    client.on("end", () => {
+    socket.on("end", () => {
         console.log("Connection ended")
         reconnect()
     });
 
-    client.on("error", () => {
+    socket.on("error", () => {
 	// console.error;
         console.log("Connection refused")
     });
@@ -801,18 +848,18 @@ function processReceivedAisData(data) {
 
 function processAIScommand(line) {
     
-    //console.log('processAIScommand',line);
+    // console.log('processAIScommand',line);
 
     // decode and AIS message
     if (line.startsWith('!AI')) { 
         var decMsg = new AisDecode (line, aisSession);
-        //console.log ('%j', decMsg);
+        // console.log ('%j', decMsg);
 
         if (decMsg.valid && decMsg.mmsi) {
     	
     	var target = targets[decMsg.mmsi];
     	
-    	//console.log('target',target);
+    	// console.log('target',target);
     	
     	if (!target) {
     	    target = {};
@@ -821,7 +868,7 @@ function processAIScommand(line) {
     	target.mmsi = decMsg.mmsi;
     	target.lastSeen = new Date().toISOString();
 
-    	//console.log('target',target);
+    	// console.log('target',target);
 
     	if (decMsg.shipname !== undefined) {
     	    target.name = decMsg.shipname;
@@ -836,7 +883,8 @@ function processAIScommand(line) {
             target.cog = decMsg.cog;
         }
 
-        // NOTE: hdg=511 is a default value that indicates heading is not available
+        // NOTE: hdg=511 is a default value that indicates heading is not
+        // available
         if (decMsg.hdg !== undefined && decMsg.hdg<=360) {
             target.hdg = decMsg.hdg;
         }
@@ -867,11 +915,22 @@ function processAIScommand(line) {
         if (decMsg.callsign !== undefined) {
             target.callsign = decMsg.callsign;
         }
+        
+        target.targetType = 1;
+        // 1 = ship - pointy box
+        // 2 = triangle
+        // 3 = triangle
+        // 4 = diamond
+        // 5 = triangle
+        // 6 = circle/cross sart
+        // 7 = mob
+        // 8 = epirb
+        // 993 = 
 
     	targets[decMsg.mmsi] = target;
 
-    	//console.log('target',target);
-    	//console.log('targets',targets);
+    	// console.log('target',target);
+    	// console.log('targets',targets);
 
         }
 
@@ -880,7 +939,7 @@ function processAIScommand(line) {
     // decode NMEA message
     if (line.startsWith('$GP')) {
         var decMsg = new NmeaDecode (line);
-        //console.log ('%j', decMsg);
+        // console.log ('%j', decMsg);
         
 	    // FIXME: add GPS accuracy and satellite data... meh
 		
@@ -899,7 +958,7 @@ function processAIScommand(line) {
                 gpsModel.sog = decMsg.sog;
             }
 
-            //console.log('gpsModel',gpsModel);
+            // console.log('gpsModel',gpsModel);
         }
         
     }
@@ -911,7 +970,7 @@ connect();
 // try reconnect to the ais transponder if the connection drops
 function reconnect() {
     setTimeout(() => {
-        client.removeAllListeners(); 
+        socket.removeAllListeners(); 
         connect();
     }, 1000);
 }
@@ -1059,7 +1118,8 @@ function evaluateAlarms(target) {
     // guard alarm
     target.guardAlarm = (
             target.range < collisionProfiles[collisionProfiles.current].guard.range 
-            && target.sog > collisionProfiles[collisionProfiles.current].guard.speed
+            && (target.sog > collisionProfiles[collisionProfiles.current].guard.speed
+                    || collisionProfiles[collisionProfiles.current].guard.speed == 0)
     );
     
     // collision alarm
@@ -1067,7 +1127,8 @@ function evaluateAlarms(target) {
             target.cpa < collisionProfiles[collisionProfiles.current].danger.cpa
             && target.tcpa > 0
             && target.tcpa < collisionProfiles[collisionProfiles.current].danger.tcpa 
-            && target.sog > collisionProfiles[collisionProfiles.current].danger.speed
+            && (target.sog > collisionProfiles[collisionProfiles.current].danger.speed
+                    || collisionProfiles[collisionProfiles.current].danger.speed == 0)
     );
         
     // collision warning
@@ -1075,7 +1136,8 @@ function evaluateAlarms(target) {
             target.cpa < collisionProfiles[collisionProfiles.current].warning.cpa
             && target.tcpa > 0
             && target.tcpa < collisionProfiles[collisionProfiles.current].warning.tcpa 
-            && target.sog > collisionProfiles[collisionProfiles.current].warning.speed
+            && (target.sog > collisionProfiles[collisionProfiles.current].warning.speed
+                    || collisionProfiles[collisionProfiles.current].warning.speed == 0)
     );
     
     var order = 36862;
@@ -1085,7 +1147,10 @@ function evaluateAlarms(target) {
         order = 8190;
     }
     else if (target.collisionWarning) {
-        target.dangerState = 'warning';
+        // "warning" does not produce orange icons or alams in the app, but
+        // "threat" does :)
+        // target.dangerState = 'warning';
+        target.dangerState = 'threat';
         order = 16382;
     }
     else {
@@ -1170,7 +1235,7 @@ function getCollisionProfiles(filename) {
     try {
         var data = fs.readFileSync(`./${filename}`);
         myObj = JSON.parse(data);
-        //console.dir(myObj);
+        // console.dir(myObj);
     }
     catch (err) {
         console.log('There has been an error parsing your JSON.')
