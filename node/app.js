@@ -54,6 +54,28 @@ var anchorWatch = {
 };
 
 // for testing:
+gpsModel = {
+	lat: (1+25/60),
+	lon: (1+10/60),
+	cog: 0,
+	sog: 0,
+}
+
+// for testing
+for (var i=1; i<=50; i++) {
+	for (var j=1; j<=20; j++) {
+		var mmsi = (100000000+(i*j)).toString();
+		targets[mmsi] = {
+			mms: mmsi,
+			lat: (1+i/60),
+			lon: (1+j/60),
+			cog: 0,
+			sog: 0,
+			targetType: (i*j),
+		}
+	}
+}
+
 // targets['111111111'] = {
 // mmsi: '111111111',
 // lat: 37.5,
@@ -383,7 +405,7 @@ function getAlarmsXml() {
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
 <Range>${formatRange(target.range)}</Range>
 <BearingTrue>${target.bearing||''}</BearingTrue>
-<TargetType>1</TargetType>
+<TargetType>${target.targetType||''}</TargetType>
 </Alarm>
 `;
         }
