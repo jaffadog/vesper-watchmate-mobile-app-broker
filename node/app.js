@@ -92,6 +92,16 @@ var aisDeviceModel = {
 
 // GET /v3/watchMate/collisionProfiles
 
+// TODO: improvements:
+// integrate with raspberry pi io terminals to trigger audible alarm when:
+//	- cpa alarm
+//	- guard alarm
+//	- mob/sart detection
+// 	- loss of gps fix
+// intergate with raspberry pi io terminals to silence the alarm (push button)
+// age out gps fix when stale
+// accept alarm mute command from app
+
 var collisionProfiles;
 
 collisionProfiles = getCollisionProfiles('collisionProfiles.json');
