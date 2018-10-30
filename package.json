@@ -1,5 +1,5 @@
 {
-  "name": "Vesper WatchMate Mobile App Broker",
+  "name": "vesper-watchmate-mobile-app-broker",
   "version": "1.0.0",
   "description": "Use the Vesper WatchMate mobile app with any AIS transponder",
   "main": "app.js",
@@ -15,5 +15,6 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Jeremy Waters",
-  "license": "ISC"
+  "license": "gpl-3.0"
+"
 }
