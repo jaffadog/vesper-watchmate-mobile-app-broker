@@ -1,19 +1,25 @@
 {
-  "name": "vesper-watchmate-mobile-app-broker",
-  "version": "1.0.0",
-  "description": "Use the Vesper WatchMate mobile app with any AIS transponder",
-  "main": "app.js",
-  "dependencies": {
-    "express": "^4.16.4",
-    "geolib": "^2.0.24",
-    "ggencoder": "^1.0.2",
-    "lethexa-motionpredict": "^0.4.1",
-    "magvar": "^1.0.0"
-  },
-  "devDependencies": {},
-  "scripts": {
-    "start": "node app.js"
-  },
-  "author": "Jeremy Waters",
-  "license": "gpl-3.0"
+	"name": "vesper-watchmate-mobile-app-broker",
+	"version": "1.0.0",
+	"description": "Use the Vesper WatchMate mobile app with any AIS transponder",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/jaffadog/vesper-watchmate-mobile-app-broker.git"
+	},
+	"main": "app.js",
+	"dependencies": {
+		"express": "^4.16.4",
+		"geolib": "^2.0.24",
+		"ggencoder": "^1.0.2",
+		"lethexa-motionpredict": "^0.4.1",
+		"magvar": "^1.0.0"
+	},
+	"devDependencies": {
+		
+	},
+	"scripts": {
+		"start": "node app.js"
+	},
+	"author": "Jeremy Waters",
+	"license": "GPL-3.0-only"
 }
