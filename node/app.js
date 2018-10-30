@@ -43,9 +43,9 @@ const tcpPort = 39150;
 const httpPort = 39151;
 
 const aisHostname = '127.0.0.1';
-const iasPort = 3000;
+const aisPort = 3000;
 
-var gpsModel = {};
+var gps = {};
 var targets = {};
 var aisSession = {};
 var anchorWatch = {
@@ -53,36 +53,43 @@ var anchorWatch = {
         alarmRadius: 30
 };
 
+var ii = 10;
+var jj = 10;
+
 // for testing:
-gpsModel = {
-	lat: (1+25/60),
-	lon: (1+10/60),
+gps = {
+	lat: (1+0/60),
+	lon: (1+0/60),
 	cog: 0,
 	sog: 0,
 }
 
 // for testing
-for (var i=1; i<=50; i++) {
-	for (var j=1; j<=20; j++) {
-		var mmsi = (100000000+(i*j)).toString();
-		targets[mmsi] = {
-			mms: mmsi,
-			lat: (1+i/60),
-			lon: (1+j/60),
-			cog: 0,
-			sog: 0,
-			targetType: (i*j),
-		}
-	}
-}
+// for (var i=0; i<ii; i++) {
+// for (var j=0; j<jj; j++) {
+// var mmsi = (100000000+(i*ii+j)+1).toString();
+// targets[mmsi] = {
+// mmsi: mmsi,
+// lat: (1+i/60),
+// lon: (1+j/60),
+// cog: 45,
+// sog: 3,
+// targetType: (i*ii+j),
+// }
+// console.log(i,j,targets[mmsi].mmsi,targets[mmsi].lat,targets[mmsi].lon);
+// }
+// }
+// console.log(targets);
 
-// targets['111111111'] = {
-// mmsi: '111111111',
-// lat: 37.5,
-// lon: -76.3,
-// cog: 297,
-// sog: 10,
-// };
+ targets['970111111'] = {
+ mmsi: '970111111',
+ lat: 1,
+ lon: 1.05,
+ cog: 0,
+ sog: 0,
+ };
+
+
 
 // the mobile app is picky about the model number and version numbers
 // you dont get all functionality unless you provide valid values
@@ -116,13 +123,15 @@ var aisDeviceModel = {
 
 // TODO: improvements:
 // integrate with raspberry pi io terminals to trigger audible alarm when:
-//	- cpa alarm
-//	- guard alarm
-//	- mob/sart detection
-// 	- loss of gps fix
-// intergate with raspberry pi io terminals to silence the alarm (push button)
+// - cpa alarm
+// - guard alarm
+// - mob/sart detection
+// - anchor watch alarm
+// - loss of gps fix
+// integrate with raspberry pi io terminals to silence the alarm (push button)
 // age out gps fix when stale
 // accept alarm mute command from app
+// persist anchor watch state
 
 var collisionProfiles;
 
@@ -154,43 +163,36 @@ function getDeviceModelXml() {
 // so that we don't send any other gps data until we have a fix
 
 // FIXME: age out old GPS fix data - i.e. older that 5 minutes and revert back
-// to hasGPS=0 (no fix)
+// to hasGPS=0 (no fix)?
 
 function getGpsModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <GPSModel>
 <hasGPS>1</hasGPS>
-<latitudeText>${formatLat(gpsModel.lat)}</latitudeText>
-<longitudeText>${formatLon(gpsModel.lon)}</longitudeText>
-<COG>${formatCog(gpsModel.cog)}</COG>
-<SOG>${formatSog(gpsModel.sog)}</SOG>
-<HDGT>${formatCog(gpsModel.hdg)}</HDGT>
-<magvar>${formatMagvar(gpsModel.magvar)}</magvar>
+<latitudeText>${formatLat(gps.lat)}</latitudeText>
+<longitudeText>${formatLon(gps.lon)}</longitudeText>
+<COG>${formatCog(gps.cog)}</COG>
+<SOG>${formatSog(gps.sog)}</SOG>
+<HDGT>${formatCog(gps.hdg)}</HDGT>
+<magvar>${formatMagvar(gps.magvar)}</magvar>
 <hasBowPosition>0</hasBowPosition>
 <sim>stop</sim>
 </GPSModel>
 </Watchmate>`
 }
 
-// var gpsModel = {
-// latitudeText: 'N 39° 57.0689',
-// longitudeText: 'W 075° 08.3692',
-// COG: '090',
-// SOG: '0.0'
-// };
-
 function getGpsModelAdvancedXml() {
 	return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <GPSModel>
 <hasGPS>1</hasGPS>
-<latitudeText>${formatLat(gpsModel.lat)}</latitudeText>
-<longitudeText>${formatLon(gpsModel.lon)}</longitudeText>
-<COG>${formatCog(gpsModel.cog)}</COG>
-<SOG>${formatSog(gpsModel.sog)}</SOG>
-<HDGT>${formatCog(gpsModel.hdg)}</HDGT>
-<magvar>${formatMagvar(gpsModel.magvar)}</magvar>
+<latitudeText>${formatLat(gps.lat)}</latitudeText>
+<longitudeText>${formatLon(gps.lon)}</longitudeText>
+<COG>${formatCog(gps.cog)}</COG>
+<SOG>${formatSog(gps.sog)}</SOG>
+<HDGT>${formatCog(gps.hdg)}</HDGT>
+<magvar>${formatMagvar(gps.magvar)}</magvar>
 <hasBowPosition>0</hasBowPosition>
 <sim>stop</sim>
 <Fix>
@@ -316,31 +318,8 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <txCount>0</txCount>
 </channelStatus>
 </TxStatus>
-</Watchmate>`
+</Watchmate>`;
 }
-
-
-// <anchorLatitude>39.951</anchorLatitude>
-// <anchorLongitude>-75.14</anchorLongitude>
-
-// <?xml version='1.0' encoding='ISO-8859-1' ?>
-// <Watchmate version='1.0' priority='0'>
-// <AnchorWatch>
-// <setAnchor>0</setAnchor>
-// <alarmRadius>30</alarmRadius>
-// <alarmsEnabled></alarmsEnabled>
-// <anchorLatitude></anchorLatitude>
-// <anchorLongitude></anchorLongitude>
-// <anchorCorrectedLat></anchorCorrectedLat>
-// <anchorCorrectedLong></anchorCorrectedLong>
-// <usingCorrected></usingCorrected>
-// <distanceToAnchor></distanceToAnchor>
-// <bearingToAnchor></bearingToAnchor>
-// <alarmTriggered></alarmTriggered>
-// </AnchorWatch>
-// </Watchmate>
-
-
 
 function getAnchorWatchModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
@@ -662,8 +641,8 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     if (req.query["AnchorWatch.setAnchor"]) {
         console.log('setting anchorWatch.setAnchor',req.query["AnchorWatch.setAnchor"]);
         anchorWatch.setAnchor = req.query["AnchorWatch.setAnchor"];
-        anchorWatch.anchorLatitude = gpsModel.lat;
-        anchorWatch.anchorLongitude = gpsModel.lon;
+        anchorWatch.anchorLatitude = gps.lat;
+        anchorWatch.anchorLongitude = gps.lon;
     }
     
     if (req.query["AnchorWatch.alarmsEnabled"]) {
@@ -678,8 +657,6 @@ app.get('/datamodel/propertyEdited', (req, res) => {
 
     res.sendStatus(200);
 });
-
-
 
 // everything else gets a 404
 app.get('*', function(req, res) {
@@ -713,11 +690,11 @@ const tcpServer = net.createServer((connection) => {
         console.log(`TCP Server: connection DATA ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
     });
 
-//    connection.on('close', () => {
-//        console.log(`TCP Server: connection CLOSE ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
-//        connections.splice(connections.indexOf(connection), 1);
-//        console.log('connections',connections.length);
-//    });
+    connection.on('close', () => {
+        console.log(`TCP Server: connection CLOSE ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+        //connections.splice(connections.indexOf(connection), 1);
+        console.log('connections',connections.length);
+    });
     
     connection.on('end', () => {
         console.log(`TCP Server: connection END ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
@@ -729,7 +706,8 @@ const tcpServer = net.createServer((connection) => {
 
 tcpServer.on('error', (err) => {
     console.log('TCP Server: whoops!');
-    throw err;
+    console.error;
+    // throw err;
 });
 
 tcpServer.listen(tcpPort, () => {
@@ -738,7 +716,12 @@ tcpServer.listen(tcpPort, () => {
 
 function broadcast(msg) {
     connections.map(connection => {
-        connection.write(msg);
+        try {
+            connection.write(msg);
+        }
+        catch (err) {
+            console.log('error in broadcast',err.message)
+        }
     });
 }
 
@@ -768,26 +751,25 @@ setInterval(function(){
      * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
      * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
      * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-     * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
-     * socket.write(data);
+     * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
      */
 
-    if (gpsModel.lat === undefined 
-            || gpsModel.lon === undefined
-            || gpsModel.sog === undefined
-            || gpsModel.cog === undefined) {
+    if (gps.lat === undefined 
+            || gps.lon === undefined
+            || gps.sog === undefined
+            || gps.cog === undefined) {
         console.log('cant generate nmea gps message: missing data');
         return;
     } else {
-        // console.log('gpsModel',gpsModel);
+        // console.log('gps',gps);
         // encode NMEA message
         var nmeaMsg = new NmeaEncode({ 
             // standard class B Position report
             // msgtype : 18, <== NOTE: this breaks things!
-            lat        : gpsModel.lat,
-            lon        : gpsModel.lon,
-            cog        : gpsModel.cog,
-            sog        : gpsModel.sog
+            lat        : gps.lat,
+            lon        : gps.lon,
+            cog        : gps.cog,
+            sog        : gps.sog
         }); 
         
         // console.log(nmeaMsg,nmeaMsg.valid,nmeaMsg.nmea);
@@ -842,7 +824,7 @@ socket.setEncoding('latin1');
 function connect() {
     console.log("new socket");
     
-    socket.connect(iasPort, aisHostname, () => {
+    socket.connect(aisPort, aisHostname, () => {
 	console.log("Connected")
         // socket.write("Hello, server! Love, socket.")
     });
@@ -948,7 +930,32 @@ function processAIScommand(line) {
             target.callsign = decMsg.callsign;
         }
         
-        target.targetType = 1;
+        // class A
+        if (decMsg.class === 'A') {
+            target.targetType = 1;
+        }
+        // class B
+        else if (decMsg.class === 'B') {
+            target.targetType = 2;
+        }
+        // Aid to Navigation
+        else if (decMsg.aistype == 21 || decMsg.mmsi.startsWith('99')) {
+            target.targetType = 4;
+        }
+        // SART
+        else if (decMsg.mmsi.startsWith('970')) {
+            target.targetType = 6;
+        }
+        // MOB
+        else if (decMsg.mmsi.startsWith('972')) {
+            target.targetType = 7;
+        }
+        // EPIRB
+        else if (decMsg.mmsi.startsWith('974')) {
+            target.targetType = 8;
+        }
+        
+        // target.targetType = 1;
         // 1 = ship - pointy box
         // 2 = triangle
         // 3 = triangle
@@ -957,7 +964,7 @@ function processAIScommand(line) {
         // 6 = circle/cross sart
         // 7 = mob
         // 8 = epirb
-        // 993 = 
+        // 993 = aton
 
     	targets[decMsg.mmsi] = target;
 
@@ -977,20 +984,20 @@ function processAIScommand(line) {
 		
         if (decMsg.valid) {
             if (decMsg.lat !== undefined) {
-            	gpsModel.lat = decMsg.lat;
-            	gpsModel.lon = decMsg.lon;
-            	gpsModel.magvar = Magvar.Get(gpsModel.lat, gpsModel.lon);
+            	gps.lat = decMsg.lat;
+            	gps.lon = decMsg.lon;
+            	gps.magvar = Magvar.Get(gps.lat, gps.lon);
             }
 	
             if (decMsg.cog !== undefined) {
-                gpsModel.cog = decMsg.cog;
+                gps.cog = decMsg.cog;
             }
 
             if (decMsg.sog !== undefined) {
-                gpsModel.sog = decMsg.sog;
+                gps.sog = decMsg.sog;
             }
 
-            // console.log('gpsModel',gpsModel);
+            // console.log('gps',gps);
         }
         
     }
@@ -1024,8 +1031,8 @@ function formatLon(dec) {
 }
 
 function calculateRangeAndBearing(target) {
-    if (gpsModel.lat === undefined 
-	    || gpsModel.lon === undefined
+    if (gps.lat === undefined 
+	    || gps.lon === undefined
 	    || target.lat === undefined
 	    || target.lon === undefined) {
 	console.log('cant calc calculateRangeAndBearing: missing data',target.mmsi);
@@ -1039,13 +1046,13 @@ function calculateRangeAndBearing(target) {
     var range = geolib.convertUnit(
 	    'sm', 
 	    geolib.getDistance(
-		    {latitude: gpsModel.lat, longitude: gpsModel.lon},
+		    {latitude: gps.lat, longitude: gps.lon},
 		    {latitude: target.lat, longitude: target.lon}
 	    )
     );
     
     var bearing = Math.round(geolib.getRhumbLineBearing(
-	    {latitude: gpsModel.lat, longitude: gpsModel.lon},
+	    {latitude: gps.lat, longitude: gps.lon},
 	    {latitude: target.lat, longitude: target.lon}
     ));
     
@@ -1081,10 +1088,10 @@ function ageOutOldTargets(target) {
 }
 
 function updateCpa(target) {
-    if (gpsModel.lat === undefined 
-	    || gpsModel.lon === undefined
-	    || gpsModel.sog === undefined
-	    || gpsModel.cog === undefined
+    if (gps.lat === undefined 
+	    || gps.lon === undefined
+	    || gps.sog === undefined
+	    || gps.cog === undefined
 	    || target.lat === undefined
 	    || target.lon === undefined
 	    || target.sog === undefined
@@ -1098,8 +1105,8 @@ function updateCpa(target) {
      // position: lat and lon in degrees
      // velocity: in degrees/sec N/S and E/W
     
-     var position1 = [ gpsModel.lat, gpsModel.lon, 0 ];
-     var velocity1 = generateSpeedVector(gpsModel.lat,gpsModel.sog,gpsModel.cog);
+     var position1 = [ gps.lat, gps.lon, 0 ];
+     var velocity1 = generateSpeedVector(gps.lat,gps.sog,gps.cog);
     
      var position2 = [ target.lat, target.lon, 0 ];
      var velocity2 = generateSpeedVector(target.lon,target.sog,target.cog);
@@ -1172,41 +1179,48 @@ function evaluateAlarms(target) {
                     || collisionProfiles[collisionProfiles.current].warning.speed == 0)
     );
     
-    var order = 36862;
-
-    if (target.guardAlarm || target.collisionAlarm) {
+    target.sartAlarm = (target.mmsi.startsWith('970'));
+    target.mobAlarm = (target.mmsi.startsWith('972'));
+    target.epirbAlarm = (target.mmsi.startsWith('974'));
+    
+    var order;
+    
+    // alarm
+    if (target.guardAlarm 
+            || target.collisionAlarm 
+            || target.sartAlarm 
+            || target.mobAlarm 
+            || target.epirbAlarm) {
         target.dangerState = 'danger';
+        target.filteredState = 'show';
         order = 8190;
     }
+    // threat
     else if (target.collisionWarning) {
         // "warning" does not produce orange icons or alams in the app, but
         // "threat" does :)
         // target.dangerState = 'warning';
         target.dangerState = 'threat';
+        target.filteredState = 'show';
         order = 16382;
     }
+    //none
     else {
         target.dangerState = undefined;
-    }
-    
-    var alarmType = '';
-    
-    if (target.guardAlarm) {
-        alarmType = 'guard';
-    }
-
-    if (target.collisionAlarm || target.collisionWarning) {
-        alarmType += (alarmType ? ',' : '') + 'cpa';
-    }
-    
-    target.alarmType = alarmType ? alarmType : undefined;
-
-    if (target.dangerState) {
-        target.filteredState = 'show';
-    }
-    else {
         target.filteredState = 'hide';
+        var order = 36862;
     }
+    
+    var alarms = [];
+
+    if (target.guardAlarm) alarms.push('guard');
+    if (target.collisionAlarm) alarms.push('cpa');
+    if (target.sartAlarm) alarms.push('sart');
+    if (target.mobAlarm) alarms.push('mob');
+    if (target.epirbAlarm) alarms.push('epirb');
+    if (target.collisionWarning) alarms.push('cpa');
+
+    target.alarmType = alarms.join(',');
 
     if (target.tcpa > 0) {
         // tcpa of 0 seconds reduces order by 1000 (this is an arbitrary
