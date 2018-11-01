@@ -735,52 +735,57 @@ app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort
 var connectionNumber = 0;
 let connections = [];
 
-const tcpServer = net.createServer((connection) => {
-    
-    connectionNumber++;
-    console.log(`TCP Server: new connection ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
-    
-    connection.id = connectionNumber;
-    connections.push(connection);
-    console.log('connections',connections.length);
-    
-    connection.on('data', data => {
-        console.log(`TCP Server: connection DATA ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
-    });
+try {
+	const tcpServer = net.createServer((connection) => {
+	    
+	    connectionNumber++;
+	    console.log(`TCP Server: new connection ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+	    
+	    connection.id = connectionNumber;
+	    connections.push(connection);
+	    console.log('connections',connections.length);
+	    
+	    connection.on('data', data => {
+	        console.log(`TCP Server: connection DATA ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
+	    });
 
-    connection.on('close', () => {
-        console.log(`TCP Server: connection CLOSE ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
-        // connections.splice(connections.indexOf(connection), 1);
-        console.log('connections',connections.length);
-    });
-    
-    connection.on('end', () => {
-        console.log(`TCP Server: connection END ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
-        connections.splice(connections.indexOf(connection), 1);
-        console.log('connections',connections.length);
-    });
-    
-});
+	    connection.on('close', () => {
+	        console.log(`TCP Server: connection CLOSE ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+	        // connections.splice(connections.indexOf(connection), 1);
+	        console.log('connections',connections.length);
+	    });
+	    
+	    connection.on('end', () => {
+	        console.log(`TCP Server: connection END ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+	        connections.splice(connections.indexOf(connection), 1);
+	        console.log('connections',connections.length);
+	    });
+	    
+	});
 
-tcpServer.on('error', (err) => {
-    console.log('TCP Server: whoops!');
-    console.error;
-    // throw err;
-});
+	tcpServer.on('error', (err) => {
+	    console.log('TCP Server: whoops!');
+	    console.error;
+	    // throw err;
+	});
 
-tcpServer.listen(tcpPort, () => {
-    console.log(`TCP Server: listening on ${tcpServer.address().address}:${tcpServer.address().port}`);
-});
+	tcpServer.listen(tcpPort, () => {
+	    console.log(`TCP Server: listening on ${tcpServer.address().address}:${tcpServer.address().port}`);
+	});
+}
+catch (err) {
+    console.log('error in tcp server',err.message)
+}
 
 function broadcast(msg) {
-    connections.map(connection => {
-        try {
-            connection.write(msg);
-        }
-        catch (err) {
-            console.log('error in broadcast',err.message)
-        }
-    });
+    try {
+    	connections.map(connection => {
+    		connection.write(msg);
+        });
+    }
+    catch (err) {
+        console.log('error in broadcast',err.message)
+    }
 }
 
 // $GPRMC = Recommended minimum specific GPS/Transit data
@@ -1090,18 +1095,18 @@ function formatLon(dec) {
 
 function calculateRangeAndBearing(target) {
     if (gps.lat === undefined 
-	    || gps.lon === undefined
-	    || target.lat === undefined
-	    || target.lon === undefined) {
-	console.log('cant calc calculateRangeAndBearing: missing data',target.mmsi);
-	target.range = undefined;
-	target.bearing = undefined;
-	return;
+		    || gps.lon === undefined
+		    || target.lat === undefined
+		    || target.lon === undefined) {
+		console.log('cant calc calculateRangeAndBearing: missing data',target.mmsi);
+		target.range = undefined;
+		target.bearing = undefined;
+		return;
     }
 
     // or geolib.getDistanceSimple...?
     
-    var range = geolib.convertUnit(
+    target.range = geolib.convertUnit(
 	    'sm', 
 	    geolib.getDistance(
 		    {latitude: gps.lat, longitude: gps.lon},
@@ -1109,13 +1114,11 @@ function calculateRangeAndBearing(target) {
 	    )
     );
     
-    var bearing = Math.round(geolib.getRhumbLineBearing(
+    target.bearing = Math.round(geolib.getRhumbLineBearing(
 	    {latitude: gps.lat, longitude: gps.lon},
 	    {latitude: target.lat, longitude: target.lon}
     ));
-    
-    target.range = range;
-    target.bearing = bearing;
+
 }
 
 setInterval(updateAllTargets, 5000);
@@ -1241,8 +1244,6 @@ function evaluateAlarms(target) {
     target.mobAlarm = (target.mmsi.startsWith('972'));
     target.epirbAlarm = (target.mmsi.startsWith('974'));
     
-    var order;
-    
     // alarm
     if (target.guardAlarm 
             || target.collisionAlarm 
@@ -1251,22 +1252,21 @@ function evaluateAlarms(target) {
             || target.epirbAlarm) {
         target.dangerState = 'danger';
         target.filteredState = 'show';
-        order = 8190;
+        target.order = 8190;
     }
     // threat
     else if (target.collisionWarning) {
-        // "warning" does not produce orange icons or alams in the app, but
+        // "warning" does not produce orange icons or alarms in the app, but
         // "threat" does :)
-        // target.dangerState = 'warning';
         target.dangerState = 'threat';
         target.filteredState = 'show';
-        order = 16382;
+        target.order = 16382;
     }
     // none
     else {
         target.dangerState = undefined;
         target.filteredState = 'hide';
-        var order = 36862;
+        target.order = 36862;
     }
     
     var alarms = [];
@@ -1285,17 +1285,15 @@ function evaluateAlarms(target) {
         // weighting)
         // tcpa of 60 minutes reduces order by 0
         var weight = 1000;
-        order -= (weight - weight/3600*target.tcpa);
+        target.order -= Math.round(weight - weight/3600*target.tcpa);
     }
 
     if (target.cpa > 0) {
         // cpa of 0 nm reduces order by 2000 (this is an arbitrary weighting)
         // cpa of 5 nm reduces order by 0
         var weight = 2000;
-        order -= (weight - weight/5*target.cpa);
+        target.order -= Math.round(weight - weight/5*target.cpa);
     }
-
-    target.order = Math.round(order);
 
 }
 
@@ -1318,14 +1316,16 @@ function formatCpa(cpa) {
 function formatTcpa(tcpa) {
     // returns hh:mm:ss, e.g. 01:15:23
     // 012345678901234567890
-    // ******** start at 11, length 8
-    // ***** start at 14, length 5
     // 1970-01-01T00:00:07.000Z
     if (tcpa === undefined) {
         return '';
-    } else if (Math.abs(tcpa)>=3600) {
+    } 
+    // when more than 60  mins, then format hh:mm:ss
+    else if (Math.abs(tcpa)>=3600) {
         return (tcpa<0 ? '-' : '') + new Date(1000 * Math.abs(tcpa)).toISOString().substr(11,8)
-    } else {
+    } 
+    // when less than 60  mins, then format mm:ss
+    else {
         return (tcpa<0 ? '-' : '') + new Date(1000 * Math.abs(tcpa)).toISOString().substr(14,5)
     }
 }
