@@ -14,6 +14,9 @@ const geolib = require('geolib');
 const Magvar = require('magvar');
 var fs = require('fs');
 
+const mdns = require('multicast-dns')();
+const ip = require("ip");
+
 var MathFunc = {
 	    add : function(a, b) {
 		return [ a[0] + b[0], a[1] + b[1], a[2] + b[2] ]
@@ -89,7 +92,60 @@ gps = {
  sog: 0,
  };
 
-
+//setup auto-discovery
+mdns.on('query', function(query) {
+    if (query.questions[0] && query.questions[0].name === '_vesper-nmea0183._tcp.local') {
+        console.log('got a query packet:', query,'\n');
+        mdns.respond({
+            answers: [
+                {
+                    name: '_vesper-nmea0183._tcp.local', 
+                    type: 'PTR', 
+                    class: 'IN',
+                    ttl: 300,
+                    flush: true,
+                    data: 'ribbit._vesper-nmea0183._tcp.local'
+                }
+            ],
+            additionals: [
+                { 
+                    name: 'ribbit.local',
+                    type: 'A',
+                    class: 'IN',
+                    ttl: 300,
+                    flush: true,
+                    data: ip.address()
+                },{ 
+                    name: 'ribbit.local',
+                    type: 'AAAA',
+                    class: 'IN',
+                    ttl: 300,
+                    flush: true,
+                    data: ip.address('public','ipv6')
+                },{ 
+                    name: 'ribbit._vesper-nmea0183._tcp.local',
+                    type: 'SRV',
+                    class: 'IN',
+                    ttl: 300,
+                    flush: true,
+                    data: {
+                        port: 39150,
+                        weigth: 0,
+                        priority: 10,
+                        target: 'ribbit.local'
+                    }
+                },{ 
+                    name: 'ribbit._vesper-nmea0183._tcp.local',
+                    type: 'TXT',
+                    class: 'IN',
+                    ttl: 300,
+                    flush: true,
+                    data: 'nm=ribbit'
+                }
+            ]
+        });
+    }
+});
 
 // the mobile app is picky about the model number and version numbers
 // you dont get all functionality unless you provide valid values
@@ -499,12 +555,14 @@ function getCollisionProfilesJson() {
 // ======================= HTTP SERVER ========================
 // listens to requests from mobile app
 
+// disable cache / etag / 304 responses
+// noted some requests sending 304s and the mobile app freaks out 
+app.set('etag',false);
+
 // log all requests
 app.use(function(req, res, next) {
-    // this request is just way too freq. like 20/second!
-    if (req.originalUrl !== '/alarms/get_current_list') {
-        console.info(`${req.method} ${req.originalUrl}`);
-    }
+    console.info(`${req.method} ${req.originalUrl}`);
+
 	// express.js automatically adds utf-8 encoding to everything. this
 	// overrides that. the watchmate mobile app cannot deal with utf-8.
     // res.setHeader('Content-Type', 'text/xml; charset=ISO-8859-1');
@@ -692,7 +750,7 @@ const tcpServer = net.createServer((connection) => {
 
     connection.on('close', () => {
         console.log(`TCP Server: connection CLOSE ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
-        //connections.splice(connections.indexOf(connection), 1);
+        // connections.splice(connections.indexOf(connection), 1);
         console.log('connections',connections.length);
     });
     
@@ -1204,7 +1262,7 @@ function evaluateAlarms(target) {
         target.filteredState = 'show';
         order = 16382;
     }
-    //none
+    // none
     else {
         target.dangerState = undefined;
         target.filteredState = 'hide';
