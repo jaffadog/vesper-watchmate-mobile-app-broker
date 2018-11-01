@@ -761,11 +761,17 @@ try {
 	        console.log('connections',connections.length);
 	    });
 	    
+	    connection.on('error', err => {
+	        console.log(`TCP Server: connection CLOSE ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+	        console.log(err,err.stack);
+	    });
+	    
+	    
 	});
 
 	tcpServer.on('error', (err) => {
-	    console.log('TCP Server: whoops!');
-	    console.error;
+	    console.log('TCP Server: whoops!',err);
+	    //console.error;
 	    // throw err;
 	});
 
