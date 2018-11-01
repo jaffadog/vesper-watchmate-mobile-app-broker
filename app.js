@@ -762,7 +762,7 @@ try {
 	    });
 	    
 	    connection.on('error', err => {
-	        console.log(`TCP Server: connection CLOSE ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+	        console.log(`****** TCP Server: connection ERROR ${connectionNumber}`);
 	        console.log(err,err.stack);
 	    });
 	    
