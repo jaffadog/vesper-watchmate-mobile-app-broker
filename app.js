@@ -1141,12 +1141,11 @@ function updateCpa(target) {
      var velocity1 = generateSpeedVector(gps.lat,gps.sog,gps.cog);
     
      var position2 = [ target.lat, target.lon, 0 ];
-     var velocity2 = generateSpeedVector(target.lon,target.sog,target.cog);
+     var velocity2 = generateSpeedVector(target.lat,target.sog,target.cog);
      
      // console.log(position1,velocity1,position2,velocity2);
     
-     // tcpa in seconds, from now
-    
+     // returns tcpa in seconds from now
      var tcpa = motionpredict.calcCPATime(position1,velocity1,position2,velocity2);
      // console.log('tcpa (Secs)',tcpa,tcpa/60,tcpa/3600);
      
@@ -1174,6 +1173,7 @@ function updateCpa(target) {
      target.tcpa = tcpa;
 }
 
+// returns speed in degrees per second
 function generateSpeedVector (latitude, speed, course) {
     var northSpeed = speed * Math.cos(course * Math.PI / 180) / 60 / 3600;
     var eastSpeed = speed * Math.sin(course * Math.PI / 180) / 60 / 3600 * Math.abs(Math.sin(latitude * Math.PI / 180));
