@@ -37,7 +37,7 @@ var MathFunc = {
 
 const motionpredict = require('lethexa-motionpredict').withMathFunc(MathFunc);
 
-// how many minutes to keep old targets that we have not seen and ais broadcast
+// how many minutes to keep old targets that we have not seen an ais broadcast
 // for
 const ageOldTargets = true;
 const ageOldTargetsTTL = 15;
@@ -56,10 +56,10 @@ var anchorWatch = {
         alarmRadius: 30
 };
 
+//for testing:
 var ii = 10;
 var jj = 10;
 
-// for testing:
 gps = {
 	lat: (1+0/60),
 	lon: (1+0/60),
@@ -739,30 +739,30 @@ try {
 	const tcpServer = net.createServer((connection) => {
 	    
 	    connectionNumber++;
-	    console.log(`TCP Server: new connection ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
-	    
 	    connection.id = connectionNumber;
 	    connections.push(connection);
+	    
+	    console.log(`TCP Server: new connection ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
 	    console.log('connections',connections.length);
 	    
 	    connection.on('data', data => {
-	        console.log(`TCP Server: connection DATA ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
+	        console.log(`TCP Server: connection DATA ${connection.id} ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
 	    });
 
 	    connection.on('close', () => {
-	        console.log(`TCP Server: connection CLOSE ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+	        console.log(`TCP Server: connection CLOSE ${connection.id} ${connection.remoteAddress}:${connection.remotePort}`);
 	        // connections.splice(connections.indexOf(connection), 1);
 	        console.log('connections',connections.length);
 	    });
 	    
 	    connection.on('end', () => {
-	        console.log(`TCP Server: connection END ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+	        console.log(`TCP Server: connection END ${connection.id} ${connection.remoteAddress}:${connection.remotePort}`);
 	        connections.splice(connections.indexOf(connection), 1);
 	        console.log('connections',connections.length);
 	    });
 	    
 	    connection.on('error', err => {
-	        console.log(`****** TCP Server: connection ERROR ${connectionNumber}`);
+	        console.log(`****** TCP Server: connection ERROR ${connection.id}`);
 	        console.log(err,err.stack);
 	    });
 	    
