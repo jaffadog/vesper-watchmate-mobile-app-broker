@@ -69,6 +69,8 @@ targets['970111111'] = {
 		sog: 0,
 };
 
+var connectionNumber = 0;
+
 const tcpServer = net.createServer((connection) => {
     
     connectionNumber++;
