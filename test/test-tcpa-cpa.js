@@ -65,11 +65,11 @@ function formatTcpa(tcpa) {
     if (tcpa === undefined) {
         return '';
     } 
-    // when more than 60  mins, then format hh:mm:ss
+    // when more than 60 mins, then format hh:mm:ss
     else if (Math.abs(tcpa)>=3600) {
         return (tcpa<0 ? '-' : '') + new Date(1000 * Math.abs(tcpa)).toISOString().substr(11,8)
     } 
-    // when less than 60  mins, then format mm:ss
+    // when less than 60 mins, then format mm:ss
     else {
         return (tcpa<0 ? '-' : '') + new Date(1000 * Math.abs(tcpa)).toISOString().substr(14,5)
     }
@@ -115,13 +115,21 @@ function updateCpa(target) {
      var cpaPosition1 = motionpredict.getPositionByVeloAndTime(position1,velocity1,tcpa);
      var cpaPosition2 = motionpredict.getPositionByVeloAndTime(position2,velocity2,tcpa);
     
-     var cpa = geolib.convertUnit('sm',geolib.getDistanceSimple({
+// var cpa = geolib.convertUnit('sm',geolib.getDistanceSimple({
+// latitude : cpaPosition1[0],
+// longitude : cpaPosition1[1]
+// }, {
+// latitude : cpaPosition2[0],
+// longitude : cpaPosition2[1]
+// }));
+    
+     var cpa = geolib.getDistanceSimple({
          latitude : cpaPosition1[0],
          longitude : cpaPosition1[1]
      }, {
          latitude : cpaPosition2[0],
          longitude : cpaPosition2[1]
-     }));
+     }) / 1852;
     
      // console.log('cpa (NM)',cpa);
     
@@ -242,7 +250,41 @@ function generateSpeedVector2 (speed, course) {
     var northSpeed = speed * Math.cos(course * Math.PI / 180) * 1852 / 3600;
     var eastSpeed = speed * Math.sin(course * Math.PI / 180) * 1852 / 3600;
     return [northSpeed, eastSpeed, 0]
-}    
+} 
+
+function test3(target) {
+	addCoordsInMeters(target);
+	addCoordsInMeters(gps);
+	
+	addSpeed(target);
+	addSpeed(gps);
+	
+	console.log(gps);
+	console.log(target);
+	
+	//  t = (-xvx + avx + xva - ava - yvy + bvy + yvb - bvb) / (vx2 - 2vxva + va2 + vy2 - 2vyvb + vb2)
+	var tt = (-gps.x*gps.vx + target.x*gps.vx + gps.x*target.vx - target.x*target.vx - gps.y * gps.vy + target.y * gps.vy + gps.y*target.vy - target.y*target.vy) / 
+	(gps.vx^2 - 2*gps.vx*target.vx + target.vx^2 + gps.vy^2 - 2*gps.vy*target.vy + target.vy^2);
+	
+	// ([x + tvx − (a + tva)]2 + [y + tvy − (b + tvb)]2 )½
+	//var s = ( (gps.x + t*gps.vx − (target.x + t*target.vx))^2 + (gps.y + t*gps.vy − (target.y + t*target.vy))^2 )^0.5;
+	
+	console.log(tt,tt/3600);
+	//console.log(s);
+	
+}
+
+// add x,y in m
+function addCoordsInMeters(t) {
+	t.y = t.lat * 111320;
+	t.x = t.lon * 111320 * Math.cos(t.lat * Math.PI / 180);
+}
+
+// add vx,vy in m/s
+function addSpeed(t) {
+    t.vy = t.sog * Math.cos(t.cog * Math.PI / 180) * 1852 / 3600;
+    t.vx = t.sog * Math.sin(t.cog * Math.PI / 180) * 1852 / 3600;
+}
 
 var target = targets['333333333'];
 
@@ -254,6 +296,6 @@ updateCpa2(target);
 console.log('tcpa=',target.tcpa,formatTcpa(target.tcpa));
 console.log('cpa=',target.cpa/1852,'\n');
 
-
+test3(target);
 
 
