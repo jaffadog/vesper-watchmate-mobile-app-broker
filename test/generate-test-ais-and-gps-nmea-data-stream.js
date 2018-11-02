@@ -70,6 +70,7 @@ targets['970111111'] = {
 };
 
 var connectionNumber = 0;
+var connections = [];
 
 const tcpServer = net.createServer((connection) => {
     
