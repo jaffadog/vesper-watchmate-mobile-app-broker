@@ -194,7 +194,8 @@ function updateTargetLocations() {
 function updateTargetLocation(target) {
 	var dest = geolib.computeDestinationPoint(
 			target, 
-			target.sog * updateIntervalSeconds/3600, 
+			// 1852 meters per NM
+			target.sog * updateIntervalSeconds/3600 * 1852, 
 			target.cog);
 	
 	console.log(dest);

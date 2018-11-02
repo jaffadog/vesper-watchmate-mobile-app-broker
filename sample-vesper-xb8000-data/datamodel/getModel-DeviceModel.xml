@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+	<DeviceModel>
+		<connectedDeviceType>XB-8000</connectedDeviceType>
+		<connectedDeviceUiVersion>3.04.17316</connectedDeviceUiVersion>
+		<connectedDeviceTxVersion>5.20.17443</connectedDeviceTxVersion>
+		<connectedDeviceTxBbVersion>1.2.4.0</connectedDeviceTxBbVersion>
+		<connectedDeviceSerialNumber>KW37070</connectedDeviceSerialNumber>
+	</DeviceModel>
+</Watchmate>

@@ -1,0 +1,283 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='1'>
+	<Alarm MMSI='255805923' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>3.16</Range>
+		<BearingTrue>177</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='256850000' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>3.19</Range>
+		<BearingTrue>058</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='338211341' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>0.48</Range>
+		<BearingTrue>185</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='338447000' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>5.95</Range>
+		<BearingTrue>216</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='338737000' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>2.77</Range>
+		<BearingTrue>055</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='338997000' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>5.15</Range>
+		<BearingTrue>213</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='352610000' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>2.78</Range>
+		<BearingTrue>168</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='366855710' state='danger' type='guard,cpa'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>1.21</Range>
+		<BearingTrue>174</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='366939770' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>1.16</Range>
+		<BearingTrue>170</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='366966060' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA>1.71</CPA>
+		<TCPA>6:52:48</TCPA>
+		<Range>2.12</Range>
+		<BearingTrue>069</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367061610' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>4.39</Range>
+		<BearingTrue>188</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367097920' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA>2.05</CPA>
+		<TCPA>1:19:18</TCPA>
+		<Range>5.50</Range>
+		<BearingTrue>213</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367141210' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>0.98</Range>
+		<BearingTrue>186</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367148870' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>0.57</Range>
+		<BearingTrue>187</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367315470' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>2.82</Range>
+		<BearingTrue>055</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367318760' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>4.32</Range>
+		<BearingTrue>215</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367379670' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>4.23</Range>
+		<BearingTrue>219</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367428270' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>4.24</Range>
+		<BearingTrue>214</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367552410' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>4.28</Range>
+		<BearingTrue>204</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367571980' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>0.51</Range>
+		<BearingTrue>143</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367741150' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>3.01</Range>
+		<BearingTrue>175</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='440371000' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>2.88</Range>
+		<BearingTrue>174</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='477168200' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>1.87</Range>
+		<BearingTrue>176</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='477333300' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>1.15</Range>
+		<BearingTrue>173</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='564045000' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>2.43</Range>
+		<BearingTrue>051</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='636018470' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>2.18</Range>
+		<BearingTrue>165</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='636092827' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>3.01</Range>
+		<BearingTrue>176</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='993663001' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>3.81</Range>
+		<BearingTrue>062</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+</Watchmate>

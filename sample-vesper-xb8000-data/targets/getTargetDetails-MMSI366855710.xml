@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+	<Target>
+		<IMO>0</IMO>
+		<COG></COG>
+		<HDG></HDG>
+		<ROT></ROT>
+		<Altitude>-1</Altitude>
+		<LatitudeText>N 39° 34.2617</LatitudeText>
+		<LongitudeText>W 075° 29.8876</LongitudeText>
+		<OffPosition>0</OffPosition>
+		<Virtual>1</Virtual>
+		<Dimensions>---</Dimensions>
+		<Draft>---</Draft>
+		<ClassType>ATON</ClassType>
+		<Destination></Destination>
+		<ETAText></ETAText>
+		<NavStatus>15</NavStatus>
+		<MMSI>993672159</MMSI>
+		<Name>14</Name>
+		<CallSign></CallSign>
+		<VesselTypeString>Beacon: Starboard hand</VesselTypeString>
+		<VesselType>14</VesselType>
+		<TargetType>4</TargetType>
+		<Order>36862</Order>
+		<TCPA></TCPA>
+		<CPA></CPA>
+		<Bearing>216</Bearing>
+		<Range>28.2</Range>
+		<COG2></COG2>
+		<SOG></SOG>
+		<DangerState></DangerState>
+		<AlarmType></AlarmType>
+		<FilteredState>hide</FilteredState>
+	</Target>
+</Watchmate>

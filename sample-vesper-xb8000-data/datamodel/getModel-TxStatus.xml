@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+	<TxStatus>
+		<warnMMSI>0</warnMMSI>
+		<warnSilent>0</warnSilent>
+		<warnStartup>0</warnStartup>
+		<warnGPS>0</warnGPS>
+		<warnPosReportSent>0</warnPosReportSent>
+		<statusVSWR>1</statusVSWR>
+		<valueVSWR>6</valueVSWR>
+		<antennaInUse>0</antennaInUse>
+		<gpsSBAS>0</gpsSBAS>
+		<gpsSmooth>1</gpsSmooth>
+		<gpsFastUpdate>0</gpsFastUpdate>
+		<nmeaInBaud>4800</nmeaInBaud>
+		<nmeaOutBaud>38400</nmeaOutBaud>
+		<nmeaEchoAIS>1</nmeaEchoAIS>
+		<nmeaEchoVDO>1</nmeaEchoVDO>
+		<nmeaEchoGPS>1</nmeaEchoGPS>
+		<nmeaEchoN2K>1</nmeaEchoN2K>
+		<nmeaEchoNMEA>1</nmeaEchoNMEA>
+		<n2kBus>2</n2kBus>
+		<n2kProdCode>9511</n2kProdCode>
+		<n2kAdr>21</n2kAdr>
+		<n2kDevInst>0</n2kDevInst>
+		<n2kSysInst>0</n2kSysInst>
+		<n2kPosRate>500</n2kPosRate>
+		<n2kCogRate>500</n2kCogRate>
+		<externalAlarm>2</externalAlarm>
+		<extSwitchFunc>2</extSwitchFunc>
+		<extSwitchState>0</extSwitchState>
+		<channelStatus>
+			<frequency>161.975</frequency>
+			<mode>1</mode>
+			<rssi>-105</rssi>
+			<rxCount>118</rxCount>
+			<txCount>3</txCount>
+		</channelStatus>
+		<channelStatus>
+			<frequency>162.025</frequency>
+			<mode>1</mode>
+			<rssi>-104</rssi>
+			<rxCount>121</rxCount>
+			<txCount>0</txCount>
+		</channelStatus>
+	</TxStatus>
+</Watchmate>

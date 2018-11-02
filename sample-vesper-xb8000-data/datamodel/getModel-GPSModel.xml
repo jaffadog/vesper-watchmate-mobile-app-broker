@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+	<GPSModel>
+		<hasGPS>1</hasGPS>
+		<latitudeText>N 39° 57.0689</latitudeText>
+		<longitudeText>W 075° 08.3692</longitudeText>
+		<COG>090</COG>
+		<SOG>0.0</SOG>
+		<HDGT></HDGT>
+		<magvar>-12.11</magvar>
+		<hasBowPosition>0</hasBowPosition>
+		<sim>stop</sim>
+	</GPSModel>
+</Watchmate>
