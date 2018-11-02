@@ -2,7 +2,7 @@
 
 const geolib = require('geolib');
 
-const initialLat = 35;
+const initialLat = 45;
 const initialLon = -70;
 
 var gps = {
@@ -277,7 +277,16 @@ function test3(target) {
 // add x,y in m
 function addCoordsInMeters(t) {
 	t.y = t.lat * 111320;
+	console.log('test1',t.lat,t.lon,t.x)
 	t.x = t.lon * 111320 * Math.cos(t.lat * Math.PI / 180);
+	console.log(t.lon * 111320 * Math.cos(t.lat * Math.PI / 180))
+	console.log('test3',-70.16 * 111320 * Math.cos(35.16 * Math.PI / 180))
+	console.log('test3',-70.17 * 111320 * Math.cos(35.16 * Math.PI / 180))
+	console.log('test4',-70.17 * 111320 * Math.cos(35 * Math.PI / 180));
+	console.log('test4',-70.17 * 111320 * Math.cos(35.0 * Math.PI / 180));
+	console.log('test4',-70.17 * 111320 * Math.cos(35.1 * Math.PI / 180));
+	console.log('test4',-70.17 * 111320 * Math.cos(35.2 * Math.PI / 180));
+	console.log('test2',t.lat,t.lon,t.x)
 }
 
 // add vx,vy in m/s
@@ -298,4 +307,21 @@ console.log('cpa=',target.cpa/1852,'\n');
 
 test3(target);
 
+console.log('dx',gps.x - target.x)
+console.log('dy',gps.y - target.y)
+
+console.log('0',Math.cos(0));
+console.log('pi/2',Math.cos(Math.PI/2));
+console.log('pi/2',Math.cos(3.14/2));
+console.log('pi',Math.cos(Math.PI));
+console.log('pi',Math.cos(3.14));
+console.log(Math.cos(1));
+console.log(Math.cos(90));
+console.log('35',Math.cos(35));
+console.log('35',Math.cos(35*Math.PI/180));
+console.log('35',Math.cos(35*2*3.14/360));
+
+console.log('to m',-70 * 111320 * Math.cos(0 * Math.PI / 180));
+console.log('to m',-70 * 111320 * Math.cos(35 * Math.PI / 180));
+console.log('to m',-70.17 * 111320 * Math.cos(35 * Math.PI / 180));
 
