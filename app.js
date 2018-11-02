@@ -56,42 +56,6 @@ var anchorWatch = {
         alarmRadius: 30
 };
 
-//for testing:
-var ii = 10;
-var jj = 10;
-
-gps = {
-	lat: (1+0/60),
-	lon: (1+0/60),
-	cog: 0,
-	sog: 0,
-}
-
-// for testing
-// for (var i=0; i<ii; i++) {
-// for (var j=0; j<jj; j++) {
-// var mmsi = (100000000+(i*ii+j)+1).toString();
-// targets[mmsi] = {
-// mmsi: mmsi,
-// lat: (1+i/60),
-// lon: (1+j/60),
-// cog: 45,
-// sog: 3,
-// targetType: (i*ii+j),
-// }
-// console.log(i,j,targets[mmsi].mmsi,targets[mmsi].lat,targets[mmsi].lon);
-// }
-// }
-// console.log(targets);
-
- targets['970111111'] = {
- mmsi: '970111111',
- lat: 1,
- lon: 1.05,
- cog: 0,
- sog: 0,
- };
-
 //setup auto-discovery
 mdns.on('query', function(query) {
     if (query.questions[0] && query.questions[0].name === '_vesper-nmea0183._tcp.local') {
@@ -1056,6 +1020,7 @@ function processAIScommand(line) {
             	gps.lat = decMsg.lat;
             	gps.lon = decMsg.lon;
             	gps.magvar = Magvar.Get(gps.lat, gps.lon);
+            	gps.lastFix = new Date().toISOString();
             }
 	
             if (decMsg.cog !== undefined) {
