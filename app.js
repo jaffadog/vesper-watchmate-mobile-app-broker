@@ -53,7 +53,8 @@ var targets = {};
 var aisSession = {};
 var anchorWatch = {
         setAnchor: 0,
-        alarmRadius: 30
+        alarmRadius: 30,
+        alarmTriggered: 0,
 };
 
 //setup auto-discovery
@@ -348,14 +349,14 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <setAnchor>${anchorWatch.setAnchor}</setAnchor>
 <alarmRadius>${anchorWatch.alarmRadius}</alarmRadius>
 <alarmsEnabled>${anchorWatch.setAnchor}</alarmsEnabled>
-<anchorLatitude>${anchorWatch.anchorLatitude||''}</anchorLatitude>
-<anchorLongitude>${anchorWatch.anchorLongitude||''}</anchorLongitude>
+<anchorLatitude>${Math.round(anchorWatch.lat * 1e7)||''}</anchorLatitude>
+<anchorLongitude>${Math.round(anchorWatch.lon * 1e7)||''}</anchorLongitude>
 <anchorCorrectedLat></anchorCorrectedLat>
 <anchorCorrectedLong></anchorCorrectedLong>
 <usingCorrected>0</usingCorrected>
-<distanceToAnchor>3</distanceToAnchor>
-<bearingToAnchor>123</bearingToAnchor>
-<alarmTriggered>0</alarmTriggered>
+<distanceToAnchor>${anchorWatch.distanceToAnchor||''}</distanceToAnchor>
+<bearingToAnchor>${anchorWatch.bearingToAnchor||''}</bearingToAnchor>
+<alarmTriggered>${anchorWatch.alarmTriggered}</alarmTriggered>
 </AnchorWatch>
 </Watchmate>`;
 }
@@ -663,8 +664,10 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     if (req.query["AnchorWatch.setAnchor"]) {
         console.log('setting anchorWatch.setAnchor',req.query["AnchorWatch.setAnchor"]);
         anchorWatch.setAnchor = req.query["AnchorWatch.setAnchor"];
-        anchorWatch.anchorLatitude = gps.lat;
-        anchorWatch.anchorLongitude = gps.lon;
+        // anchorLatitude of 399510671 == N 39° 57.0645
+        // 39.9510671 = 39 deg 57.064026 mins
+        anchorWatch.lat = gps.lat;
+        anchorWatch.lon = gps.lon;
     }
     
     if (req.query["AnchorWatch.alarmsEnabled"]) {
@@ -710,23 +713,23 @@ try {
 	    console.log('connections',connections.length);
 	    
 	    connection.on('data', data => {
-	        console.log(`TCP Server: connection DATA ${connection.id} ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
+	        console.log(`TCP Server: connection ${connection.id} DATA ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
 	    });
 
 	    connection.on('close', () => {
-	        console.log(`TCP Server: connection CLOSE ${connection.id} ${connection.remoteAddress}:${connection.remotePort}`);
-	        // connections.splice(connections.indexOf(connection), 1);
-	        console.log('connections',connections.length);
-	    });
-	    
-	    connection.on('end', () => {
-	        console.log(`TCP Server: connection END ${connection.id} ${connection.remoteAddress}:${connection.remotePort}`);
+	        console.log(`TCP Server: connection ${connection.id} CLOSE ${connection.remoteAddress}:${connection.remotePort}`);
 	        connections.splice(connections.indexOf(connection), 1);
 	        console.log('connections',connections.length);
 	    });
 	    
+	    connection.on('end', () => {
+	        console.log(`TCP Server: connection ${connection.id} END ${connection.remoteAddress}:${connection.remotePort}`);
+	        //connections.splice(connections.indexOf(connection), 1);
+	        console.log('connections',connections.length);
+	    });
+	    
 	    connection.on('error', err => {
-	        console.log(`****** TCP Server: connection ERROR ${connection.id}`);
+	        console.log(`****** TCP Server: connection ${connection.id} ERROR`);
 	        console.log(err,err.stack);
 	    });
 	    
@@ -842,6 +845,19 @@ setInterval(function(){
     }
     
     broadcast(message);
+    
+//    message = `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+//$GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+//$GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+//$GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+//$GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+//$GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+//$GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75
+//`;
+//    
+//    broadcast(message);
+
+    
 
 }, 4000);
     
@@ -963,20 +979,8 @@ function processAIScommand(line) {
             target.callsign = decMsg.callsign;
         }
         
-        // class A
-        if (decMsg.class === 'A') {
-            target.targetType = 1;
-        }
-        // class B
-        else if (decMsg.class === 'B') {
-            target.targetType = 2;
-        }
-        // Aid to Navigation
-        else if (decMsg.aistype == 21 || decMsg.mmsi.startsWith('99')) {
-            target.targetType = 4;
-        }
         // SART
-        else if (decMsg.mmsi.startsWith('970')) {
+        if (decMsg.mmsi.startsWith('970')) {
             target.targetType = 6;
         }
         // MOB
@@ -986,6 +990,18 @@ function processAIScommand(line) {
         // EPIRB
         else if (decMsg.mmsi.startsWith('974')) {
             target.targetType = 8;
+        }
+        // Aid to Navigation
+        else if (decMsg.aistype == 21 || decMsg.mmsi.startsWith('99')) {
+            target.targetType = 4;
+        }
+        // class A
+        else if (decMsg.class === 'A') {
+            target.targetType = 1;
+        }
+        // class B
+        else { //if (decMsg.class === 'B') {
+            target.targetType = 2;
         }
         
         // target.targetType = 1;
@@ -1109,6 +1125,8 @@ function updateAllTargets() {
             evaluateAlarms(target);
     	}
     }
+    
+    updateAnchorWatch();
 }
 
 function ageOutOldTargets(target) {
@@ -1337,3 +1355,21 @@ function saveCollisionProfiles() {
     }
 }
 
+function updateAnchorWatch() {
+    if (!anchorWatch.setAnchor) {
+        return;
+    }
+    
+    // in meters
+    anchorWatch.distanceToAnchor = geolib.getDistance(
+            {latitude: gps.lat, longitude: gps.lon},
+            {latitude: anchorWatch.lat, longitude: anchorWatch.lon}
+        );
+    
+    anchorWatch.bearingToAnchor = Math.round(geolib.getRhumbLineBearing(
+            {latitude: gps.lat, longitude: gps.lon},
+            {latitude: anchorWatch.lat, longitude: anchorWatch.lon}
+        ));
+
+    anchorWatch.alarmTriggered = (anchorWatch.distanceToAnchor > anchorWatch.alarmRadius) ? 1 : 0;
+}
