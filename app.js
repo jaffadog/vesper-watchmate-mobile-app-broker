@@ -17,26 +17,6 @@ var fs = require('fs');
 const mdns = require('multicast-dns')();
 const ip = require("ip");
 
-var MathFunc = {
-	    add : function(a, b) {
-		return [ a[0] + b[0], a[1] + b[1], a[2] + b[2] ]
-	    },
-	    sub : function(a, b) {
-		return [ a[0] - b[0], a[1] - b[1], a[2] - b[2] ]
-	    },
-	    mulScalar : function(a, s) {
-		return [ a[0] * s, a[1] * s, a[2] * s ]
-	    },
-	    dot : function(a, b) {
-		return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-	    },
-	    lengthSquared : function(a) {
-		return a[0] * a[0] + a[1] * a[1] + a[2] * a[2]
-	    }
-	};
-
-const motionpredict = require('lethexa-motionpredict').withMathFunc(MathFunc);
-
 // how many minutes to keep old targets that we have not seen an ais broadcast
 // for
 const ageOldTargets = true;
@@ -57,7 +37,7 @@ var anchorWatch = {
         alarmTriggered: 0,
 };
 
-//setup auto-discovery
+// setup auto-discovery
 mdns.on('query', function(query) {
     if (query.questions[0] && query.questions[0].name === '_vesper-nmea0183._tcp.local') {
         console.log('got a query packet:', query,'\n');
@@ -521,7 +501,7 @@ function getCollisionProfilesJson() {
 // listens to requests from mobile app
 
 // disable cache / etag / 304 responses
-// noted some requests sending 304s and the mobile app freaks out 
+// noted some requests sending 304s and the mobile app freaks out
 app.set('etag',false);
 
 // log all requests
@@ -724,7 +704,7 @@ try {
 	    
 	    connection.on('end', () => {
 	        console.log(`TCP Server: connection ${connection.id} END ${connection.remoteAddress}:${connection.remotePort}`);
-	        //connections.splice(connections.indexOf(connection), 1);
+	        // connections.splice(connections.indexOf(connection), 1);
 	        console.log('connections',connections.length);
 	    });
 	    
@@ -738,7 +718,7 @@ try {
 
 	tcpServer.on('error', (err) => {
 	    console.log('TCP Server: whoops!',err);
-	    //console.error;
+	    // console.error;
 	    // throw err;
 	});
 
@@ -780,15 +760,15 @@ setInterval(function(){
     var message = '';
     
     /*
-     * var data =
-     * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-     * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-     * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-     * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-     * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-     * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-     * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
-     */
+	 * var data =
+	 * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+	 * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+	 * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+	 * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+	 * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+	 * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+	 * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
+	 */
 
     if (gps.lat === undefined 
             || gps.lon === undefined
@@ -846,16 +826,17 @@ setInterval(function(){
     
     broadcast(message);
     
-//    message = `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-//$GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-//$GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-//$GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-//$GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-//$GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-//$GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75
-//`;
+// message =
+// `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+// $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+// $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+// $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+// $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+// $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+// $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75
+// `;
 //    
-//    broadcast(message);
+// broadcast(message);
 
     
 
@@ -1000,7 +981,7 @@ function processAIScommand(line) {
             target.targetType = 1;
         }
         // class B
-        else { //if (decMsg.class === 'B') {
+        else { // if (decMsg.class === 'B') {
             target.targetType = 2;
         }
         
@@ -1137,73 +1118,111 @@ function ageOutOldTargets(target) {
     }
 }
 
+// from: http://geomalgorithms.com/a07-_distance.html
 function updateCpa(target) {
     if (gps.lat === undefined 
-	    || gps.lon === undefined
-	    || gps.sog === undefined
-	    || gps.cog === undefined
-	    || target.lat === undefined
-	    || target.lon === undefined
-	    || target.sog === undefined
-	    || target.cog === undefined) {
-	console.log('cant calc cpa: missing data',target.mmsi);
+    	    || gps.lon === undefined
+    	    || gps.sog === undefined
+    	    || gps.cog === undefined
+    	    || target.lat === undefined
+    	    || target.lon === undefined
+    	    || target.sog === undefined
+    	    || target.cog === undefined) {
+    	console.log('cant calc cpa: missing data',target.mmsi);
         target.cpa = undefined;
         target.tcpa = undefined;
-	return;
+    	return;
     }
-    
-     // position: lat and lon in degrees
-     // velocity: in degrees/sec N/S and E/W
-    
-     var position1 = [ gps.lat, gps.lon, 0 ];
-     var velocity1 = generateSpeedVector(gps.lat,gps.sog,gps.cog);
-    
-     var position2 = [ target.lat, target.lon, 0 ];
-     var velocity2 = generateSpeedVector(target.lat,target.sog,target.cog);
-     
-     // console.log(position1,velocity1,position2,velocity2);
-    
-     // returns tcpa in seconds from now
-     var tcpa = motionpredict.calcCPATime(position1,velocity1,position2,velocity2);
-     // console.log('tcpa (Secs)',tcpa,tcpa/60,tcpa/3600);
-     
-     if (!tcpa) {
-         console.log('cant calc tcpa: ',target.mmsi);
-         target.cpa = undefined;
-         target.tcpa = undefined;
-         return;
-     }
-    
-     var cpaPosition1 = motionpredict.getPositionByVeloAndTime(position1,velocity1,tcpa);
-     var cpaPosition2 = motionpredict.getPositionByVeloAndTime(position2,velocity2,tcpa);
-    
-     var cpa = geolib.convertUnit('sm',geolib.getDistanceSimple({
-         latitude : cpaPosition1[0],
-         longitude : cpaPosition1[1]
-     }, {
-         latitude : cpaPosition2[0],
-         longitude : cpaPosition2[1]
-     }));
-    
-     // console.log('cpa (NM)',cpa);
-    
-     target.cpa = cpa;
-     target.tcpa = tcpa;
+	
+    // add x,y in meters from me/gps
+	addRelativeCoords(target,gps);
+	// add vx,vy in m/s
+	addSpeed(target);
+	addSpeed(gps);
+
+	// dv = Tr1.v - Tr2.v (this is delta v)
+	var dv = {
+			x: gps.vx - target.vx,
+			y: gps.vy - target.vy,
+	}
+	
+	var dv2 = dot(dv,dv);
+	
+	// guard against division by zero
+	// the tracks are almost parallel
+	// or there is almost no relative movement
+	if (dv2 < 0.00000001) {
+        console.log('cant calc tcpa: ',target.mmsi);
+        target.cpa = undefined;
+        target.tcpa = undefined;
+        return;
+	}
+	
+	// w0 = Tr1.P0 - Tr2.P0
+	// we shifted location frame of reference to gps/me=0,0
+	var w0 = {
+			x: 0 - target.x,
+			y: 0 - target.y,
+	}
+	
+	var tcpa = -dot(w0,dv) / dv2;
+	
+    if (!tcpa) {
+        console.log('cant calc tcpa: ',target.mmsi);
+        target.cpa = undefined;
+        target.tcpa = undefined;
+        return;
+    }
+
+	// Point P1 = Tr1.P0 + (ctime * Tr1.v);
+	var p1 = {
+			x: 0 + tcpa*gps.vx,
+			y: 0 + tcpa*gps.vy,
+	}
+	
+	// Point P2 = Tr2.P0 + (ctime * Tr2.v);
+	var p2 = {
+			x: target.x + tcpa*target.vx,
+			y: target.y + tcpa*target.vy,
+	}
+
+	var cpa = dist(p1,p2);
+	
+	target.cpa = cpa/1852;
+    target.tcpa = tcpa;
 }
 
-// returns speed in degrees per second
-function generateSpeedVector (latitude, speed, course) {
-    var northSpeed = speed * Math.cos(course * Math.PI / 180) / 60 / 3600;
-    var eastSpeed = speed * Math.sin(course * Math.PI / 180) / 60 / 3600 * Math.abs(Math.sin(latitude * Math.PI / 180));
-    return [northSpeed, eastSpeed, 0]
-}    
+// add x,y in m relative to me/gps
+function addRelativeCoords(target,gps) {
+	target.y = (target.lat - gps.lat) * 111120;
+	target.x = (target.lon - gps.lon) * 111120 * Math.cos(gps.lat * Math.PI / 180);
+}
+
+// add vx,vy in m/s
+function addSpeed(target) {
+	target.vy = target.sog * Math.cos(target.cog * Math.PI / 180) * 1852 / 3600;
+	target.vx = target.sog * Math.sin(target.cog * Math.PI / 180) * 1852 / 3600;
+}
+
+// #define dot(u,v) ((u).x * (v).x + (u).y * (v).y + (u).z * (v).z)
+function dot(u,v) {
+	return u.x * v.x + u.y * v.y;
+}
+
+// #define norm(v) sqrt(dot(v,v)) // norm = length of vector
+function norm(v) {
+	return Math.sqrt(dot(v,v));
+}
+
+// #define d(u,v) norm(u-v) // distance = norm of difference
+function dist(u,v) {
+	return norm({
+		x: u.x - v.x,
+		y: u.y - v.y,
+	});
+}
 
 function evaluateAlarms(target) {
-    // <Order>8190</Order>
-    // <DangerState>danger</DangerState>
-    // <AlarmType>guard</AlarmType>
-    // <FilteredState>show</FilteredState>
-    
     // guard alarm
     target.guardAlarm = (
             target.range < collisionProfiles[collisionProfiles.current].guard.range 
@@ -1309,11 +1328,11 @@ function formatTcpa(tcpa) {
     if (tcpa === undefined) {
         return '';
     } 
-    // when more than 60  mins, then format hh:mm:ss
+    // when more than 60 mins, then format hh:mm:ss
     else if (Math.abs(tcpa)>=3600) {
         return (tcpa<0 ? '-' : '') + new Date(1000 * Math.abs(tcpa)).toISOString().substr(11,8)
     } 
-    // when less than 60  mins, then format mm:ss
+    // when less than 60 mins, then format mm:ss
     else {
         return (tcpa<0 ? '-' : '') + new Date(1000 * Math.abs(tcpa)).toISOString().substr(14,5)
     }
