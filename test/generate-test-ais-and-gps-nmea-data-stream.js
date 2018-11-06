@@ -209,7 +209,7 @@ function updateTargetLocation(target) {
 	var λ1 = target.lon * Math.PI / 180;
 	
 	var d = target.sog * updateIntervalSeconds/3600 * 1852;
-	var brng = target.cog;
+	var brng = target.cog * Math.PI / 180;
 	
 	var φ2 = Math.asin( Math.sin(φ1)*Math.cos(d/R) +
             Math.cos(φ1)*Math.sin(d/R)*Math.cos(brng) );
@@ -217,6 +217,8 @@ function updateTargetLocation(target) {
 	var λ2 = λ1 + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(φ1),
                  Math.cos(d/R)-Math.sin(φ1)*Math.sin(φ2));
 	
-	target.lat = φ2;
-	target.lon = λ2;
+	target.lat = φ2 * 180 / Math.PI;
+	target.lon = λ2 * 180 / Math.PI;
+	
+	console.log(target);
 }
