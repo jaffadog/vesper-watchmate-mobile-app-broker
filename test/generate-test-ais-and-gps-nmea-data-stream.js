@@ -147,35 +147,35 @@ setInterval(function(){
     // console.log(nmeaMsg,nmeaMsg.valid,nmeaMsg.nmea);
     if (nmeaMsg.valid) message += nmeaMsg.nmea + '\n';
 
-//    for (var mmsi in targets) {
-//        var target = targets[mmsi];
-//
-//        // encode AIS message
-//        var encMsg = new AisEncode({
-//            aistype    : 3,
-//            mmsi       : target.mmsi,
-//            lat: target.lat,
-//            lon: target.lon,
-//            cog: target.cog,
-//            sog: target.sog,
-//            navstatus: target.navstatus
-//        }); 
-//        
-//        // console.log(encMsg,encMsg.valid,encMsg.nmea);
-//        if (encMsg.valid) message += encMsg.nmea + '\n';
-//
-//        // encode AIS message
-//        var encMsg = new AisEncode ({
-//            aistype    : 5,
-//            mmsi       : target.mmsi,
-//            callsign: target.callsign,
-//            shipname: target.shipname,
-//            cargo: target.cargo,
-//        }); 
-//        
-//        // console.log(encMsg,encMsg.valid,encMsg.nmea);
-//        if (encMsg.valid) message += encMsg.nmea + '\n';
-//    }
+    for (var mmsi in targets) {
+        var target = targets[mmsi];
+
+        // encode AIS message
+        var encMsg = new AisEncode({
+            aistype    : 3,
+            mmsi       : target.mmsi,
+            lat: target.lat,
+            lon: target.lon,
+            cog: target.cog,
+            sog: target.sog,
+            navstatus: target.navstatus
+        }); 
+        
+        // console.log(encMsg,encMsg.valid,encMsg.nmea);
+        if (encMsg.valid) message += encMsg.nmea + '\n';
+
+        // encode AIS message
+        var encMsg = new AisEncode ({
+            aistype    : 5,
+            mmsi       : target.mmsi,
+            callsign: target.callsign,
+            shipname: target.shipname,
+            cargo: target.cargo,
+        }); 
+        
+        // console.log(encMsg,encMsg.valid,encMsg.nmea);
+        if (encMsg.valid) message += encMsg.nmea + '\n';
+    }
     
     broadcast(message);
     console.log(message + '\n\n');

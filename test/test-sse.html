@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>Listening for streaming data from http://192.168.15.1:39151/v3/openChannel</h1>
+<div id="result"></div>
+
+<script>
+    var source = new EventSource("http://192.168.15.1:39151/v3/openChannel");
+    source.onmessage = function(event) {
+        document.getElementById("result").innerHTML += event.data + "<br><br>";
+    };
+</script>
+
+</body>
+</html>
+

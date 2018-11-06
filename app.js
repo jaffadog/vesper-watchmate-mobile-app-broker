@@ -564,6 +564,8 @@ app.get('/datamodel/getModel', (req, res) => {
 // </Watchmate>`;
 // res.send( new Buffer(xml,'latin1') );
         console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
+        console.log(req,'\n\n');
+        console.log(res,'\n\n');
         res.sendStatus(404);
     }
 
@@ -671,6 +673,8 @@ app.get('*', function(req, res) {
 // </Watchmate>`;
 // res.send( new Buffer(xml,'latin1') );
     console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
+    console.log(req,'\n\n');
+    console.log(res,'\n\n');
     res.sendStatus(404);
 });
 
