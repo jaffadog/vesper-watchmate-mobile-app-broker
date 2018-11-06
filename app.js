@@ -367,6 +367,10 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 </Watchmate>`;
 }
 
+// FIXME: should this return an empty body if there are no alarms? 
+// or an empty <Alarm/> 
+// something other than a 200 status?
+
 function getAlarmsXml() {
     var response = 
 `<?xml version='1.0' encoding='ISO-8859-1' ?>
@@ -564,8 +568,8 @@ app.get('/datamodel/getModel', (req, res) => {
 // </Watchmate>`;
 // res.send( new Buffer(xml,'latin1') );
         console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
-        console.log(req,'\n\n');
-        console.log(res,'\n\n');
+        //console.log(req,'\n\n');
+        //console.log(res,'\n\n');
         res.sendStatus(404);
     }
 
@@ -673,8 +677,8 @@ app.get('*', function(req, res) {
 // </Watchmate>`;
 // res.send( new Buffer(xml,'latin1') );
     console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
-    console.log(req,'\n\n');
-    console.log(res,'\n\n');
+    //console.log(req,'\n\n');
+    //console.log(res,'\n\n');
     res.sendStatus(404);
 });
 
@@ -1284,11 +1288,10 @@ function evaluateAlarms(target) {
     var alarms = [];
 
     if (target.guardAlarm) alarms.push('guard');
-    if (target.collisionAlarm) alarms.push('cpa');
+    if (target.collisionAlarm || target.collisionWarning) alarms.push('cpa');
     if (target.sartAlarm) alarms.push('sart');
     if (target.mobAlarm) alarms.push('mob');
     if (target.epirbAlarm) alarms.push('epirb');
-    if (target.collisionWarning) alarms.push('cpa');
 
     target.alarmType = alarms.join(',');
 

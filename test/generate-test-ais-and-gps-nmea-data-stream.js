@@ -192,16 +192,30 @@ function updateTargetLocations() {
 }
 
 function updateTargetLocation(target) {
-	var dest = geolib.computeDestinationPoint(
-			target, 
-			// sog in kn - so nm per hour
-			// 3600 seconds per hour
-			// 1852 meters per nm
-			target.sog * updateIntervalSeconds/3600 * 1852, 
-			target.cog);
+//	var dest = geolib.computeDestinationPoint(
+//			target, 
+//			// sog in kn - so nm per hour
+//			// 3600 seconds per hour
+//			// 1852 meters per nm
+//			target.sog * updateIntervalSeconds/3600 * 1852, 
+//			target.cog);
+//	
+//	//console.log(dest);
+//	target.lat = dest.latitude;
+//	target.lon = dest.longitude;
 	
-	//console.log(dest);
+	var R = 6371e3; // metres
+	var φ1 = lat1.toRadians();
 	
-	target.lat = dest.latitude;
-	target.lon = dest.longitude;
+	var d = target.sog * updateIntervalSeconds/3600 * 1852;
+	var brng = target.cog;
+	
+	var φ2 = Math.asin( Math.sin(φ1)*Math.cos(d/R) +
+            Math.cos(φ1)*Math.sin(d/R)*Math.cos(brng) );
+	
+	var λ2 = λ1 + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(φ1),
+                 Math.cos(d/R)-Math.sin(φ1)*Math.sin(φ2));
+	
+	target.lat = φ2;
+	target.lon = λ2;
 }
