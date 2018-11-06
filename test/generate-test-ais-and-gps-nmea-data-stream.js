@@ -205,7 +205,8 @@ function updateTargetLocation(target) {
 //	target.lon = dest.longitude;
 	
 	var R = 6371e3; // metres
-	var φ1 = lat1.toRadians();
+	var φ1 = target.lat.toRadians();
+	var λ1 = target.lon.toRadians();
 	
 	var d = target.sog * updateIntervalSeconds/3600 * 1852;
 	var brng = target.cog;
