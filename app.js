@@ -60,13 +60,16 @@ mdns.on('query', function(query) {
                     ttl: 300,
                     flush: true,
                     data: ip.address()
-                },{ 
-                    name: 'ribbit.local',
-                    type: 'AAAA',
-                    class: 'IN',
-                    ttl: 300,
-                    flush: true,
-                    data: ip.address('public','ipv6')
+                    // FIXME: the ip6 block below result inthe mobile app
+                    // reporting an additional
+                    // discovery with ip 0.0.0.0
+                    // },{
+                    // name: 'ribbit.local',
+                    // type: 'AAAA',
+                    // class: 'IN',
+                    // ttl: 300,
+                    // flush: true,
+                    // data: ip.address('public','ipv6')
                 },{ 
                     name: 'ribbit._vesper-nmea0183._tcp.local',
                     type: 'SRV',
@@ -367,8 +370,8 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 </Watchmate>`;
 }
 
-// FIXME: should this return an empty body if there are no alarms? 
-// or an empty <Alarm/> 
+// FIXME: should this return an empty body if there are no alarms?
+// or an empty <Alarm/>
 // something other than a 200 status?
 
 function getAlarmsXml() {
@@ -568,8 +571,8 @@ app.get('/datamodel/getModel', (req, res) => {
 // </Watchmate>`;
 // res.send( new Buffer(xml,'latin1') );
         console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
-        //console.log(req,'\n\n');
-        //console.log(res,'\n\n');
+        // console.log(req,'\n\n');
+        // console.log(res,'\n\n');
         res.sendStatus(404);
     }
 
@@ -677,8 +680,8 @@ app.get('*', function(req, res) {
 // </Watchmate>`;
 // res.send( new Buffer(xml,'latin1') );
     console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
-    //console.log(req,'\n\n');
-    //console.log(res,'\n\n');
+    // console.log(req,'\n\n');
+    // console.log(res,'\n\n');
     res.sendStatus(404);
 });
 
@@ -768,15 +771,15 @@ setInterval(function(){
     var message = '';
     
     /*
-	 * var data =
-	 * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-	 * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-	 * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-	 * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-	 * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-	 * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-	 * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
-	 */
+     * var data =
+     * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+     * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+     * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+     * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+     * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+     * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+     * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
+     */
 
     if (gps.lat === undefined 
             || gps.lon === undefined
@@ -1034,6 +1037,7 @@ function processAIScommand(line) {
 
             if (decMsg.sog !== undefined) {
                 gps.sog = decMsg.sog;
+                console.log('********* from nmea sog',decMsg.sog,gps.sog)
             }
 
             // console.log('gps',gps);
@@ -1113,7 +1117,12 @@ function updateAllTargets() {
             updateCpa(target);
             evaluateAlarms(target);
     	}
+    	
+    	console.log(target);
     }
+    
+    console.log(gps);
+
     
     updateAnchorWatch();
 }
@@ -1142,16 +1151,18 @@ function updateCpa(target) {
     	return;
     }
 	
-    // add x,y in meters from me/gps
-	addRelativeCoords(target,gps);
-	// add vx,vy in m/s
+    // add x,y in meters
+    addCoords(target);
+    addCoords(gps);
+	// add vx,vy in m/H
 	addSpeed(target);
 	addSpeed(gps);
 
-	// dv = Tr1.v - Tr2.v (this is delta v)
+	// dv = Tr1.v - Tr2.v 
+	// this is relative speed
 	var dv = {
-			x: gps.vx - target.vx,
-			y: gps.vy - target.vy,
+            x: target.vx - gps.vx,
+            y: target.vy - gps.vy,
 	}
 	
 	var dv2 = dot(dv,dv);
@@ -1167,12 +1178,13 @@ function updateCpa(target) {
 	}
 	
 	// w0 = Tr1.P0 - Tr2.P0
-	// we shifted location frame of reference to gps/me=0,0
+	// this is relative position
 	var w0 = {
-			x: 0 - target.x,
-			y: 0 - target.y,
+			x: (target.lon - gps.lon) * 111120 * Math.cos(gps.lat * Math.PI/180),
+            y: (target.lat - gps.lat) * 111120,
 	}
 	
+	// in hours
 	var tcpa = -dot(w0,dv) / dv2;
 	
     if (!tcpa) {
@@ -1184,8 +1196,8 @@ function updateCpa(target) {
 
 	// Point P1 = Tr1.P0 + (ctime * Tr1.v);
 	var p1 = {
-			x: 0 + tcpa*gps.vx,
-			y: 0 + tcpa*gps.vy,
+            x: gps.x + tcpa*gps.vx,
+            y: gps.y + tcpa*gps.vy,
 	}
 	
 	// Point P2 = Tr2.P0 + (ctime * Tr2.v);
@@ -1194,22 +1206,23 @@ function updateCpa(target) {
 			y: target.y + tcpa*target.vy,
 	}
 
+	// in meters
 	var cpa = dist(p1,p2);
 	
 	target.cpa = cpa/1852;
-    target.tcpa = tcpa;
+    target.tcpa = tcpa*60;
 }
 
-// add x,y in m relative to me/gps
-function addRelativeCoords(target,gps) {
-	target.y = (target.lat - gps.lat) * 111120;
-	target.x = (target.lon - gps.lon) * 111120 * Math.cos(gps.lat * Math.PI / 180);
+// add x,y in m
+function addCoords(target) {
+	target.y = target.lat * 111120;
+	target.x = target.lon * 111120 * Math.cos(gps.lat * Math.PI / 180);
 }
 
-// add vx,vy in m/s
+// add vx,vy in m/H
 function addSpeed(target) {
-	target.vy = target.sog * Math.cos(target.cog * Math.PI / 180) * 1852 / 3600;
-	target.vx = target.sog * Math.sin(target.cog * Math.PI / 180) * 1852 / 3600;
+	target.vy = target.sog * Math.cos(target.cog * Math.PI / 180) * 1852;
+	target.vx = target.sog * Math.sin(target.cog * Math.PI / 180) * 1852;
 }
 
 // #define dot(u,v) ((u).x * (v).x + (u).y * (v).y + (u).z * (v).z)
@@ -1228,6 +1241,25 @@ function dist(u,v) {
 		x: u.x - v.x,
 		y: u.y - v.y,
 	});
+}
+
+function getDestination(target,d) {
+    var R = 6371e3; // metres
+    var φ1 = target.lat * Math.PI / 180;
+    var λ1 = target.lon * Math.PI / 180;
+    
+    var brng = target.cog * Math.PI / 180;
+    
+    var φ2 = Math.asin( Math.sin(φ1)*Math.cos(d/R) +
+            Math.cos(φ1)*Math.sin(d/R)*Math.cos(brng) );
+    
+    var λ2 = λ1 + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(φ1),
+                 Math.cos(d/R)-Math.sin(φ1)*Math.sin(φ2));
+    
+    return {
+        lat: φ2 * 180 / Math.PI,
+        lon: λ2 * 180 / Math.PI,
+    }
 }
 
 function evaluateAlarms(target) {

@@ -179,6 +179,8 @@ setInterval(function(){
     
     broadcast(message);
     console.log(message + '\n\n');
+    
+    console.log(gps);
 
 }, updateIntervalSeconds*1000);
 
