@@ -945,7 +945,7 @@ function processAIScommand(line) {
         }
 
     	if (decMsg.sog !== undefined) {
-    	    target.sog = decMsg.sog;
+    	    target.sog = decMsg.sog; 
     	}
 
     	if (decMsg.cargo !== undefined) {
@@ -1036,7 +1036,9 @@ function processAIScommand(line) {
             }
 
             if (decMsg.sog !== undefined) {
-                gps.sog = decMsg.sog;
+                gps.sog = parseFloat(decMsg.nmea[7])
+                // decMsg.sog; this is actually m/s with 1 decimal place... not what
+                // we want. so we grab the raw nmea value above
                 console.log('********* from nmea sog',decMsg.sog,gps.sog)
             }
 
@@ -1158,7 +1160,7 @@ function updateCpa(target) {
 	addSpeed(target);
 	addSpeed(gps);
 
-	// dv = Tr1.v - Tr2.v 
+	// dv = Tr1.v - Tr2.v
 	// this is relative speed
 	var dv = {
             x: target.vx - gps.vx,
@@ -1209,8 +1211,11 @@ function updateCpa(target) {
 	// in meters
 	var cpa = dist(p1,p2);
 	
+	// convert to nm
 	target.cpa = cpa/1852;
-    target.tcpa = tcpa*60;
+    
+	// convert to secs
+	target.tcpa = tcpa*3600;
 }
 
 // add x,y in m
@@ -1230,12 +1235,14 @@ function dot(u,v) {
 	return u.x * v.x + u.y * v.y;
 }
 
-// #define norm(v) sqrt(dot(v,v)) // norm = length of vector
+// #define norm(v) sqrt(dot(v,v)) 
+// norm = length of vector
 function norm(v) {
 	return Math.sqrt(dot(v,v));
 }
 
-// #define d(u,v) norm(u-v) // distance = norm of difference
+// #define d(u,v) norm(u-v) 
+// distance = norm of difference
 function dist(u,v) {
 	return norm({
 		x: u.x - v.x,
