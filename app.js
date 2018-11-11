@@ -17,10 +17,10 @@ var fs = require('fs');
 const mdns = require('multicast-dns')();
 const ip = require("ip");
 
-// how many minutes to keep old targets that we have not seen an ais broadcast
-// for
+// how long to keep old targets that we have not seen in a while
+// in minutes
 const ageOldTargets = true;
-const ageOldTargetsTTL = 15;
+const ageOldTargetsTTL = 20;
 
 const tcpPort = 39150;
 const httpPort = 39151;
@@ -36,6 +36,7 @@ var anchorWatch = {
         alarmRadius: 30,
         alarmTriggered: 0,
 };
+var alarm = false;
 
 // setup auto-discovery
 mdns.on('query', function(query) {
@@ -126,27 +127,32 @@ var aisDeviceModel = {
 // GET /v3/watchMate/collisionProfiles
 
 // TODO: improvements:
-// integrate with raspberry pi io terminals to trigger audible alarm when:
-// - cpa alarm
-// - guard alarm
-// - mob/sart detection
-// - anchor watch alarm
-// - loss of gps fix
-// integrate with raspberry pi io terminals to silence the alarm (push button)
+// integrate with raspberry pi gpio terminals to trigger audible alarm when:
+// - cpa alarm - fast alarm
+// - guard alarm - fast alarm
+// - mob/sart detection - fast alarm
+// - anchor watch alarm - med alarm
+// - loss of gps fix - slow alarm
+// integrate with raspberry pi gpio terminals to silence the alarm (push button)
 // age out gps fix when stale
 // accept alarm mute command from app
 // persist anchor watch state
 
-var collisionProfiles;
+// should we advance ais targets using dead reconning?
 
-collisionProfiles = getCollisionProfiles('collisionProfiles.json');
+// for anchor watch, store position every 30 secs for 24 hours
+// automatically activate anchor watch when boat is stopped for 5 mins... or detect reverse movement
+// automatically turn anchor watch off when... moving more than x knots? or more that x miles from anchor? 
+// automatically switch to anchored profile when anchored - DONE
+// automatically switch to coastal profile when anchor up - DONE
+
+var collisionProfiles = getCollisionProfiles('collisionProfiles.json');
 
 // if it failed to load, try load the backup/original copy
 if (!collisionProfiles) {
     collisionProfiles = getCollisionProfiles('collisionProfiles-original.json');
+    saveCollisionProfiles();
 }
-
-saveCollisionProfiles();
 
 function getDeviceModelXml() {
 	var xml = 
@@ -597,6 +603,12 @@ app.get('/prefs/setPreferences', (req, res) => {
     }
 });
 
+// GET /alarms/mute_alarm
+app.get('/alarms/mute_alarm', (req, res) => {
+    muteAlarms();
+    res.sendStatus(200);
+});
+
 // GET /alarms/get_current_list
 app.get('/alarms/get_current_list', (req, res) => {
     res.send( new Buffer(getAlarmsXml(),'latin1') );
@@ -648,17 +660,39 @@ app.get('/prefs/start_notifying', (req, res) => {
 
 // GET /datamodel/propertyEdited?AnchorWatch.setAnchor=1
 app.get('/datamodel/propertyEdited', (req, res) => {
-    var setAnchor = req.query["AnchorWatch.setAnchor"];
     
     if (req.query["AnchorWatch.setAnchor"]) {
         console.log('setting anchorWatch.setAnchor',req.query["AnchorWatch.setAnchor"]);
         anchorWatch.setAnchor = req.query["AnchorWatch.setAnchor"];
         // anchorLatitude of 399510671 == N 39° 57.0645
         // 39.9510671 = 39 deg 57.064026 mins
+
+        var setAnchor = req.query["AnchorWatch.setAnchor"];
+        
+        if (setAnchor == 1) {
+            anchorWatch.lat = gps.lat;
+            anchorWatch.lon = gps.lon;
+            collisionProfiles.current = "anchor";
+        } else {
+            collisionProfiles.current = "coastal";
+        }
+
+        saveCollisionProfiles();
+    }
+
+    if (setAnchor == 0) {
+        console.log('setting anchorWatch.setAnchor',req.query["AnchorWatch.setAnchor"]);
+        anchorWatch.setAnchor = req.query["AnchorWatch.setAnchor"];
+        // anchorLatitude of 399510671 == N 39° 57.0645
+        // 39.9510671 = 39 deg 57.064026 mins
         anchorWatch.lat = gps.lat;
         anchorWatch.lon = gps.lon;
+
+        // automatically switch to "anchor" ais profile
+        collisionProfiles.current = "anchor";
+        saveCollisionProfiles();
     }
-    
+
     if (req.query["AnchorWatch.alarmsEnabled"]) {
         console.log('setting anchorWatch.alarmsEnabled',req.query["AnchorWatch.alarmsEnabled"]);
         anchorWatch.alarmsEnabled = req.query["AnchorWatch.alarmsEnabled"];
@@ -1037,7 +1071,8 @@ function processAIScommand(line) {
 
             if (decMsg.sog !== undefined) {
                 gps.sog = parseFloat(decMsg.nmea[7])
-                // decMsg.sog; this is actually m/s with 1 decimal place... not what
+                // decMsg.sog; this is actually m/s with 1 decimal place... not
+                // what
                 // we want. so we grab the raw nmea value above
                 console.log('********* from nmea sog',decMsg.sog,gps.sog)
             }
@@ -1120,11 +1155,10 @@ function updateAllTargets() {
             evaluateAlarms(target);
     	}
     	
-    	console.log(target);
+    	// console.log(target);
     }
     
-    console.log(gps);
-
+    // console.log(gps);
     
     updateAnchorWatch();
 }
@@ -1235,13 +1269,13 @@ function dot(u,v) {
 	return u.x * v.x + u.y * v.y;
 }
 
-// #define norm(v) sqrt(dot(v,v)) 
+// #define norm(v) sqrt(dot(v,v))
 // norm = length of vector
 function norm(v) {
 	return Math.sqrt(dot(v,v));
 }
 
-// #define d(u,v) norm(u-v) 
+// #define d(u,v) norm(u-v)
 // distance = norm of difference
 function dist(u,v) {
 	return norm({
@@ -1437,4 +1471,20 @@ function updateAnchorWatch() {
         ));
 
     anchorWatch.alarmTriggered = (anchorWatch.distanceToAnchor > anchorWatch.alarmRadius) ? 1 : 0;
+}
+
+function muteAlarms() {
+    for (var mmsi in targets) {
+        var target = targets[mmsi];
+        if (target.dangerState === 'danger') {
+            target.alarmMuted = true;
+        }
+    }
+    
+    // TODO: or should we just silence the anchor watch for 20 minutes? that
+    // might be better
+    // FIXME only turn it off is no target related alarms were found
+    if (anchorWatch.alarmTriggered) {
+        anchorWatch.setAnchor = 0;
+    }
 }

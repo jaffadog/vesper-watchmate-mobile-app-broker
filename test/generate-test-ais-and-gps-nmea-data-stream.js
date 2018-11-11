@@ -8,7 +8,7 @@ const geolib = require('geolib');
 const tcpPort = 3000;
 const initialLat = 35;
 const initialLon = -70;
-const updateIntervalSeconds = 5;
+const updateIntervalSeconds = 3;
 
 var gps = {
 	lat: initialLat,
