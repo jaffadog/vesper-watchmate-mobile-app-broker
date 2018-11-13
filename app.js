@@ -17,6 +17,10 @@ var fs = require('fs');
 const mdns = require('multicast-dns')();
 const ip = require("ip");
 
+const Gpio = require('onoff').Gpio;
+const led = new Gpio(17, 'out');
+const button = new Gpio(4, 'in', 'rising', {debounceTimeout: 10});
+
 // how long to keep old targets that we have not seen in a while
 // in minutes
 const ageOldTargets = true;
@@ -25,6 +29,8 @@ const ageOldTargetsTTL = 20;
 const tcpPort = 39150;
 const httpPort = 39151;
 
+// FIXME: these are point of config... maybe use properties file.. or command
+// line parameters
 const aisHostname = '127.0.0.1';
 const aisPort = 3000;
 
@@ -34,9 +40,10 @@ var aisSession = {};
 var anchorWatch = {
         setAnchor: 0,
         alarmRadius: 30,
+        alarmsEnabled: 0,
         alarmTriggered: 0,
 };
-var alarm = false;
+var alarmInterval;
 
 // setup auto-discovery
 mdns.on('query', function(query) {
@@ -140,11 +147,25 @@ var aisDeviceModel = {
 
 // should we advance ais targets using dead reconning?
 
-// for anchor watch, store position every 30 secs for 24 hours
-// automatically activate anchor watch when boat is stopped for 5 mins... or detect reverse movement
-// automatically turn anchor watch off when... moving more than x knots? or more that x miles from anchor? 
+// for anchor watch, store position every 30 secs for 24 hours (2880 points)
+// automatically activate anchor watch when boat is stopped for 5 mins... or
+// detect reverse movement
+// automatically turn anchor watch off when... moving more than x knots? or more
+// that x miles from anchor?
 // automatically switch to anchored profile when anchored - DONE
 // automatically switch to coastal profile when anchor up - DONE
+
+// pi needs:
+// 12v in (or 5v depending on what we do for power)
+// switch lead
+// buzzer/LED lead
+// nmea in (ethernet... or wifi... or ttl/uart...)
+
+// pi zero power:
+// boot: 120-140 mA @ 5v = 0.6-0.7 w = 50-60 mA @ 12v = 1.4 Ah
+// idle: 50-70 mA @ 5v = 20-30 mA @ 12v = 0.7 Ah
+// xb6000 2.5 w = 5 Ah
+// xb8000 4.0 w = 8 Ah
 
 var collisionProfiles = getCollisionProfiles('collisionProfiles.json');
 
@@ -331,13 +352,15 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 </Watchmate>`;
 }
 
+// anchorLatitude of 399510671 == N 39° 57.0645
+// 39.9510671 = 39 deg 57.064026 mins
 function getAnchorWatchModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <AnchorWatch>
 <setAnchor>${anchorWatch.setAnchor}</setAnchor>
 <alarmRadius>${anchorWatch.alarmRadius}</alarmRadius>
-<alarmsEnabled>${anchorWatch.setAnchor}</alarmsEnabled>
+<alarmsEnabled>${anchorWatch.alarmsEnabled}</alarmsEnabled>
 <anchorLatitude>${Math.round(anchorWatch.lat * 1e7)||''}</anchorLatitude>
 <anchorLongitude>${Math.round(anchorWatch.lon * 1e7)||''}</anchorLongitude>
 <anchorCorrectedLat></anchorCorrectedLat>
@@ -662,34 +685,20 @@ app.get('/prefs/start_notifying', (req, res) => {
 app.get('/datamodel/propertyEdited', (req, res) => {
     
     if (req.query["AnchorWatch.setAnchor"]) {
-        console.log('setting anchorWatch.setAnchor',req.query["AnchorWatch.setAnchor"]);
-        anchorWatch.setAnchor = req.query["AnchorWatch.setAnchor"];
-        // anchorLatitude of 399510671 == N 39° 57.0645
-        // 39.9510671 = 39 deg 57.064026 mins
-
         var setAnchor = req.query["AnchorWatch.setAnchor"];
+        console.log('setting anchorWatch.setAnchor',setAnchor);
+        anchorWatch.setAnchor = setAnchor;
         
         if (setAnchor == 1) {
             anchorWatch.lat = gps.lat;
             anchorWatch.lon = gps.lon;
+            anchorWatch.alarmsEnabled = 1;
             collisionProfiles.current = "anchor";
         } else {
+            anchorWatch.alarmsEnabled = 0;
             collisionProfiles.current = "coastal";
         }
 
-        saveCollisionProfiles();
-    }
-
-    if (setAnchor == 0) {
-        console.log('setting anchorWatch.setAnchor',req.query["AnchorWatch.setAnchor"]);
-        anchorWatch.setAnchor = req.query["AnchorWatch.setAnchor"];
-        // anchorLatitude of 399510671 == N 39° 57.0645
-        // 39.9510671 = 39 deg 57.064026 mins
-        anchorWatch.lat = gps.lat;
-        anchorWatch.lon = gps.lon;
-
-        // automatically switch to "anchor" ais profile
-        collisionProfiles.current = "anchor";
         saveCollisionProfiles();
     }
 
@@ -805,15 +814,15 @@ setInterval(function(){
     var message = '';
     
     /*
-     * var data =
-     * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-     * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-     * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-     * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-     * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-     * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-     * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
-     */
+	 * var data =
+	 * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+	 * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+	 * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+	 * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+	 * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+	 * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+	 * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
+	 */
 
     if (gps.lat === undefined 
             || gps.lon === undefined
@@ -1141,6 +1150,8 @@ function calculateRangeAndBearing(target) {
 setInterval(updateAllTargets, 5000);
 
 function updateAllTargets() {
+    addCoords(gps);
+	addSpeed(gps);
     for (var mmsi in targets) {
     	var target = targets[mmsi];
     	var targetDeleted = false;
@@ -1189,10 +1200,8 @@ function updateCpa(target) {
 	
     // add x,y in meters
     addCoords(target);
-    addCoords(gps);
 	// add vx,vy in m/H
 	addSpeed(target);
-	addSpeed(gps);
 
 	// dv = Tr1.v - Tr2.v
 	// this is relative speed
@@ -1284,25 +1293,6 @@ function dist(u,v) {
 	});
 }
 
-function getDestination(target,d) {
-    var R = 6371e3; // metres
-    var φ1 = target.lat * Math.PI / 180;
-    var λ1 = target.lon * Math.PI / 180;
-    
-    var brng = target.cog * Math.PI / 180;
-    
-    var φ2 = Math.asin( Math.sin(φ1)*Math.cos(d/R) +
-            Math.cos(φ1)*Math.sin(d/R)*Math.cos(brng) );
-    
-    var λ2 = λ1 + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(φ1),
-                 Math.cos(d/R)-Math.sin(φ1)*Math.sin(φ2));
-    
-    return {
-        lat: φ2 * 180 / Math.PI,
-        lon: λ2 * 180 / Math.PI,
-    }
-}
-
 function evaluateAlarms(target) {
     // guard alarm
     target.guardAlarm = (
@@ -1342,6 +1332,9 @@ function evaluateAlarms(target) {
         target.dangerState = 'danger';
         target.filteredState = 'show';
         target.order = 8190;
+        if (!target.alarmMuted) {
+        	startAlarm();
+        }
     }
     // threat
     else if (target.collisionWarning) {
@@ -1471,7 +1464,34 @@ function updateAnchorWatch() {
         ));
 
     anchorWatch.alarmTriggered = (anchorWatch.distanceToAnchor > anchorWatch.alarmRadius) ? 1 : 0;
+    
+    if (anchorWatch.alarmsEnabled == 1 && anchorWatch.alarmTriggered == 1) {
+    	startAlarm();
+    }
 }
+
+function startAlarm() {
+	// toggle led on and off every 500 ms
+	alarmInterval = setInterval(function() {
+		var onOff = led.readSync() ^ 1;
+		console.log('alarm!',onOff);
+		led.writeSync(onOff);
+	}, 500);
+}
+
+function stopAlarm() {
+    clearInterval(alarmInterval);
+    led.writeSync(0);
+}
+
+button.watch((err, value) => {
+	console.log('button pressed - muting alarm');
+	if (err) {
+		throw err;
+	}
+
+	muteAlarms();
+});
 
 function muteAlarms() {
     for (var mmsi in targets) {
@@ -1483,8 +1503,15 @@ function muteAlarms() {
     
     // TODO: or should we just silence the anchor watch for 20 minutes? that
     // might be better
-    // FIXME only turn it off is no target related alarms were found
-    if (anchorWatch.alarmTriggered) {
-        anchorWatch.setAnchor = 0;
+    if (anchorWatch.alarmsEnabled == 1 && anchorWatch.alarmTriggered == 1) {
+    	anchorWatch.alarmsEnabled = 0;
     }
+    
+    // stop the mayhem
+    stopAlarm();
 }
+
+process.on('SIGINT', () => {
+	led.unexport();
+	button.unexport();
+});

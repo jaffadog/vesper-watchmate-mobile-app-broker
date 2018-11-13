@@ -16,3 +16,12 @@ There will be limits in what Vesper WatchMate mobile app functionality will work
 What will definitely not be supported:
 
 - Transponder firmware updates
+
+A few features that are in the works:
+
+- Integrate with Raspberry Pi GPIO terminals to sound a beeper and/or blink and LED when an alarm is raised.
+- Integrate with Raspberry Pi GPIO terminals to permit the alarm to be silenced/muted.
+- Automatically enable anchor watch and switch to "anchor" collision profile when the vessel has stopped moving for X minutes.
+- Automatically disable anchor watch and switch to "coastal" collision profile when vessel is moving than X knots and is more than Y miles from the anchor location.
+
+The above features enable fully automated use of both collison and anchor watch alarms without any user interaction and without the need to use any mobile app. And all of this will run 24x7 with super-low power consumption (~ less than 4 watts or 8 Ah) 
