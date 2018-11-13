@@ -43,7 +43,7 @@ var anchorWatch = {
         alarmsEnabled: 0,
         alarmTriggered: 0,
 };
-var alarmInterval;
+var alarm;
 
 // setup auto-discovery
 mdns.on('query', function(query) {
@@ -1471,16 +1471,19 @@ function updateAnchorWatch() {
 }
 
 function startAlarm() {
-	// toggle led on and off every 500 ms
-	alarmInterval = setInterval(function() {
-		var onOff = led.readSync() ^ 1;
-		console.log('alarm!',onOff);
-		led.writeSync(onOff);
-	}, 500);
+	if (!alarm) {
+		// toggle led on and off every 500 ms
+		alarm = setInterval(function() {
+			var onOff = led.readSync() ^ 1;
+			console.log('alarm!',onOff);
+			led.writeSync(onOff);
+		}, 500);
+	}
 }
 
 function stopAlarm() {
-    clearInterval(alarmInterval);
+    clearInterval(alarm);
+	alarm = undefined;
     led.writeSync(0);
 }
 
