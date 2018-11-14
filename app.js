@@ -1081,9 +1081,7 @@ function processAIScommand(line) {
             if (decMsg.sog !== undefined) {
                 gps.sog = parseFloat(decMsg.nmea[7])
                 // decMsg.sog; this is actually m/s with 1 decimal place... not
-                // what
-                // we want. so we grab the raw nmea value above
-                console.log('********* from nmea sog',decMsg.sog,gps.sog)
+                // what we want. so we grab the raw nmea value above
             }
 
             // console.log('gps',gps);
@@ -1515,6 +1513,7 @@ function muteAlarms() {
 }
 
 process.on('SIGINT', () => {
+    stopAlarm();
 	led.unexport();
 	button.unexport();
 });
