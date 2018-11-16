@@ -17,9 +17,26 @@ const fs = require('fs');
 const mdns = require('multicast-dns')();
 const ip = require("ip");
 
-const Gpio = require('onoff').Gpio;
-const led = new Gpio(17, 'out');
-const button = new Gpio(4, 'in', 'rising', {debounceTimeout: 10});
+// FIXME: need a more elegant way to handle this. loading gpio blows up
+// on non-pi platforms
+try {
+    const Gpio = require('onoff').Gpio;
+    
+    const led = new Gpio(17, 'out');
+    const button = new Gpio(4, 'in', 'rising', {debounceTimeout: 10});
+    
+    button.watch((err, value) => {
+        console.log('alarm off');
+        if (err) {
+            throw err;
+        }
+
+        muteAlarms();
+    });
+}
+catch (err) {
+    console.log(err);
+}
 
 // how long to keep old targets that we have not seen in a while
 // in minutes
@@ -44,7 +61,7 @@ var anchorWatch = {
         alarmTriggered: 0,
 };
 var alarm;
-var positions[];
+var positions = [];
 
 // setup auto-discovery
 mdns.on('query', function(query) {
@@ -687,20 +704,12 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     
     if (req.query["AnchorWatch.setAnchor"]) {
         var setAnchor = req.query["AnchorWatch.setAnchor"];
-        console.log('setting anchorWatch.setAnchor',setAnchor);
-        anchorWatch.setAnchor = setAnchor;
-        
-        if (setAnchor == 1) {
-            anchorWatch.lat = gps.lat;
-            anchorWatch.lon = gps.lon;
-            anchorWatch.alarmsEnabled = 1;
-            collisionProfiles.current = "anchor";
-        } else {
-            anchorWatch.alarmsEnabled = 0;
-            collisionProfiles.current = "coastal";
-        }
 
-        saveCollisionProfiles();
+        if (setAnchor == 1) {
+            setAnchored();
+        } else {
+            setUnderway();
+        }
     }
 
     if (req.query["AnchorWatch.alarmsEnabled"]) {
@@ -1102,6 +1111,24 @@ function reconnect() {
     }, 1000);
 }
 
+function setAnchored() {
+    console.log('setting anchored');
+    anchorWatch.lat = gps.lat;
+    anchorWatch.lon = gps.lon;
+    anchorWatch.alarmsEnabled = 1;
+    anchorWatch.setAnchor = 1;
+    collisionProfiles.current = "anchor";
+    saveCollisionProfiles();
+}
+
+function setUnderway() {
+    console.log('setting underway');
+    anchorWatch.alarmsEnabled = 0;
+    anchorWatch.setAnchor = 0;
+    collisionProfiles.current = "coastal";
+    saveCollisionProfiles();
+}
+
 // latitudeText: 'N 39° 57.0689',
 function formatLat(dec) {
     var decAbs = Math.abs(dec);
@@ -1187,10 +1214,39 @@ function savePosition() {
 			time: new Date().toISOString(),
 		});
 		
-		if (p.length > 2880) {
-			p.length = 2880;
+		if (positions.length > 2880) {
+		    positions.length = 2880;
 		}
 	}
+	
+	var recentPositions = positions.slice(0,10);
+	
+	// don't evaluate movement until we have atleast 3 sequential positions
+	if (recentPositions.length < 3) {
+	    return;
+	}
+	
+	recentPositions.forEach(function(position) {
+	    position.latitude = position.lat;
+	    position.longitude = position.lon;
+	});
+	
+	// in nm
+	var dist = geolib.getPathLength(recentPositions) / 1582;
+	var avgSpeed = dist/(recentPositions.length*30/3600);
+	//console.log('distance travelled over last 5 minutes:',dist,recentPositions);
+	
+	// if we are underway, and average speed is less than 0.25 knots, then consider us anchored
+	if (anchorWatch.setAnchor == 0 && avgSpeed < 0.25) {
+        setAnchored();
+	} 
+	
+	// if we are anchored, and more than 500 meters from the anchor, 
+	// then consider us underway
+	if (anchorWatch.setAnchor == 1 && anchorWatch.distanceToAnchor > 500) {
+        setUnderway();
+	}
+
 }
 
 function ageOutOldTargets(target) {
@@ -1516,15 +1572,6 @@ function stopAlarm() {
         console.log('error in stopAlarm',err.message);
     }
 }
-
-button.watch((err, value) => {
-	console.log('alarm off');
-	if (err) {
-		throw err;
-	}
-
-	muteAlarms();
-});
 
 function muteAlarms() {
     for (var mmsi in targets) {
