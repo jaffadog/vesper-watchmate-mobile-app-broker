@@ -12,7 +12,7 @@ const bodyParser = require('body-parser');
 const net = require('net');
 const geolib = require('geolib');
 const Magvar = require('magvar');
-var fs = require('fs');
+const fs = require('fs');
 
 const mdns = require('multicast-dns')();
 const ip = require("ip");
@@ -44,6 +44,7 @@ var anchorWatch = {
         alarmTriggered: 0,
 };
 var alarm;
+var positions[];
 
 // setup auto-discovery
 mdns.on('query', function(query) {
@@ -1145,6 +1146,10 @@ function calculateRangeAndBearing(target) {
 
 }
 
+// save posiution every 30 seconds
+setInterval(savePosition, 30000);
+
+// update targets and alarms every 5 seconds
 setInterval(updateAllTargets, 5000);
 
 function updateAllTargets() {
@@ -1170,6 +1175,22 @@ function updateAllTargets() {
     // console.log(gps);
     
     updateAnchorWatch();
+}
+
+// save position
+// keep up to 2880 positions (24 houts at 30 sec cadence)
+function savePosition() {
+	if (gps.lat !== undefined) {
+		positions.unshift({
+			lat: gps.lat,
+			lon: gps.lon,
+			time: new Date().toISOString(),
+		});
+		
+		if (p.length > 2880) {
+			p.length = 2880;
+		}
+	}
 }
 
 function ageOutOldTargets(target) {
@@ -1470,23 +1491,34 @@ function updateAnchorWatch() {
 
 function startAlarm() {
 	if (!alarm) {
+		console.log('alarm on');
 		// toggle led on and off every 500 ms
 		alarm = setInterval(function() {
-			var onOff = led.readSync() ^ 1;
-			console.log('alarm!',onOff);
-			led.writeSync(onOff);
+			try {
+				var onOff = led.readSync() ^ 1;
+				console.log('alarm!',onOff);
+				led.writeSync(onOff);
+			}
+		    catch (err) {
+		        console.log('error in startAlarm',err.message);
+		    }
 		}, 500);
 	}
 }
 
 function stopAlarm() {
-    clearInterval(alarm);
-	alarm = undefined;
-    led.writeSync(0);
+	try {
+	    clearInterval(alarm);
+		alarm = undefined;
+	    led.writeSync(0);
+	}
+    catch (err) {
+        console.log('error in stopAlarm',err.message);
+    }
 }
 
 button.watch((err, value) => {
-	console.log('button pressed - muting alarm');
+	console.log('alarm off');
 	if (err) {
 		throw err;
 	}
