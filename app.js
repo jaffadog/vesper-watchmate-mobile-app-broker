@@ -610,17 +610,10 @@ app.get('/datamodel/getModel', (req, res) => {
         res.send( new Buffer(getOwnStaticDataXml(),'latin1') );
     }
     
-    // everything else gets a 404
+    // unexpected request
     else {
-// res.set('Content-Type', 'text/xml');
-// var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
-// <Watchmate version='1.0' priority='0'>
-// </Watchmate>`;
-// res.send( new Buffer(xml,'latin1') );
-        console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
-        // console.log(req,'\n\n');
-        // console.log(res,'\n\n');
-        res.sendStatus(404);
+        console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
+        res.sendStatus(200);
     }
 
 });
@@ -725,17 +718,12 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     res.sendStatus(200);
 });
 
-// everything else gets a 404
+// unexpected request
 app.get('*', function(req, res) {
-// res.set('Content-Type', 'text/xml');
-// var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
-// <Watchmate version='1.0' priority='0'>
-// </Watchmate>`;
-// res.send( new Buffer(xml,'latin1') );
-    console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
+    console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
     // console.log(req,'\n\n');
     // console.log(res,'\n\n');
-    res.sendStatus(404);
+    res.sendStatus(200);
 });
 
 app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort}!`));
