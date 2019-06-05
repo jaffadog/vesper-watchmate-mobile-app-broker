@@ -624,17 +624,10 @@ app.get('/datamodel/getModel', (req, res) => {
         res.send( new Buffer(getOwnStaticDataXml(),'latin1') );
     }
     
-    // everything else gets a 404
+    // unexpected request
     else {
-// res.set('Content-Type', 'text/xml');
-// var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
-// <Watchmate version='1.0' priority='0'>
-// </Watchmate>`;
-// res.send( new Buffer(xml,'latin1') );
-        console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
-        // console.log(req,'\n\n');
-        // console.log(res,'\n\n');
-        res.sendStatus(404);
+        console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
+        res.sendStatus(200);
     }
 
 });
@@ -739,6 +732,7 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     res.sendStatus(200);
 });
 
+<<<<<<< HEAD
 var streamConnections = [];
 
 app.get('/v3/openChannel', function(req, res) {
@@ -757,9 +751,16 @@ setInterval(() => {
 
 
 
+=======
+>>>>>>> branch 'master' of git@github.com:jaffadog/vesper-watchmate-mobile-app-broker.git
 // unexpected request
 app.get('*', function(req, res) {
     console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
+<<<<<<< HEAD
+=======
+    // console.log(req,'\n\n');
+    // console.log(res,'\n\n');
+>>>>>>> branch 'master' of git@github.com:jaffadog/vesper-watchmate-mobile-app-broker.git
     res.sendStatus(200);
 });
 
