@@ -566,6 +566,20 @@ app.use(function(req, res, next) {
 	// overrides that. the watchmate mobile app cannot deal with utf-8.
     // res.setHeader('Content-Type', 'text/xml; charset=ISO-8859-1');
     res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
+    
+    res.sseSetup = function() {
+         res.writeHead(200, {
+             'Content-Type': 'text/event-stream',
+             'Cache-Control': 'no-cache',
+             'Connection': 'keep-alive'
+        })
+     }
+
+     res.sseSend = function(data) {
+         //res.write(data + "\n\n");
+         res.write("data:777:heartbeat" + JSON.stringify(data) + "\n\n");
+     }
+
 	next();
 });
 
@@ -725,17 +739,28 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     res.sendStatus(200);
 });
 
-// everything else gets a 404
+var streamConnections = [];
+
+app.get('/v3/openChannel', function(req, res) {
+    res.sseSetup();
+    res.sseSend({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
+    streamConnections.push(res);
+});
+
+setInterval(() => {
+    console.log('streamConnections.length',streamConnections.length);
+    if (streamConnections.length > 0) {
+        console.log('sending stream');
+        streamConnections[0].sseSend({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
+    }
+}, 1000);
+
+
+
+// unexpected request
 app.get('*', function(req, res) {
-// res.set('Content-Type', 'text/xml');
-// var xml = `<?xml version='1.0' encoding='ISO-8859-1' ?>
-// <Watchmate version='1.0' priority='0'>
-// </Watchmate>`;
-// res.send( new Buffer(xml,'latin1') );
-    console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
-    // console.log(req,'\n\n');
-    // console.log(res,'\n\n');
-    res.sendStatus(404);
+    console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
+    res.sendStatus(200);
 });
 
 app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort}!`));
@@ -1205,7 +1230,7 @@ function updateAllTargets() {
 }
 
 // save position
-// keep up to 2880 positions (24 houts at 30 sec cadence)
+// keep up to 2880 positions (24 hours at 30 sec cadence)
 function savePosition() {
 	if (gps.lat !== undefined) {
 		positions.unshift({
