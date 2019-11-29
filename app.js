@@ -46,6 +46,8 @@ const ageOldTargetsTTL = 20;
 const tcpPort = 39150;
 const httpPort = 39151;
 
+const xmitInterval = 1000;
+
 // FIXME: these are point of config... maybe use properties file.. or command
 // line parameters
 const aisHostname = '127.0.0.1';
@@ -732,7 +734,6 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     res.sendStatus(200);
 });
 
-<<<<<<< HEAD
 var streamConnections = [];
 
 app.get('/v3/openChannel', function(req, res) {
@@ -749,18 +750,11 @@ setInterval(() => {
     }
 }, 1000);
 
-
-
-=======
->>>>>>> branch 'master' of git@github.com:jaffadog/vesper-watchmate-mobile-app-broker.git
 // unexpected request
 app.get('*', function(req, res) {
     console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
-<<<<<<< HEAD
-=======
     // console.log(req,'\n\n');
     // console.log(res,'\n\n');
->>>>>>> branch 'master' of git@github.com:jaffadog/vesper-watchmate-mobile-app-broker.git
     res.sendStatus(200);
 });
 
@@ -930,7 +924,7 @@ setInterval(function(){
 
     
 
-}, 4000);
+}, xmitInterval);
     
 
 // ======================= TCP CLIENT ========================
@@ -1199,7 +1193,7 @@ function calculateRangeAndBearing(target) {
 
 }
 
-// save posiution every 30 seconds
+// save position every 30 seconds
 setInterval(savePosition, 30000);
 
 // update targets and alarms every 5 seconds

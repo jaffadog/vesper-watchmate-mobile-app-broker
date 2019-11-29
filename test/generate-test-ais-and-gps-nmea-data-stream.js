@@ -8,7 +8,7 @@ const geolib = require('geolib');
 const tcpPort = 3000;
 const initialLat = 35;
 const initialLon = -70;
-const updateIntervalSeconds = 3;
+const updateIntervalSeconds = 1;
 
 var gps = {
 	lat: initialLat,
@@ -128,7 +128,7 @@ function broadcast(msg) {
 }
 
 setInterval(function(){
-    console.log('start tcp xmit');
+    console.log('start tcp xmit',Date.now());
     
     updateTargetLocations();
     
@@ -222,5 +222,5 @@ function updateTargetLocation(target) {
 	target.lat = φ2 * 180 / Math.PI;
 	target.lon = λ2 * 180 / Math.PI;
 	
-	console.log(target);
+	//console.log(target);
 }
