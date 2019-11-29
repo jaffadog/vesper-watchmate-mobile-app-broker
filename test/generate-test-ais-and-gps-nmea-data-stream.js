@@ -19,28 +19,37 @@ var gps = {
 
 var targets = {};
 
-targets['111111111'] = {
-		mmsi: '111111111',
+targets[111111111] = {
+		mmsi: 111111111,
+		shipname: 'shipanme1',
+		callsign: 'WTF1111',
 		lat: initialLat + 10/60,
 		lon: initialLon + 6/60,
 		cog: 200,
 		sog: 15,
+		navstatus: 0
 }
 
-targets['222222222'] = {
-		mmsi: '222222222',
+targets[222222222] = {
+		mmsi: 222222222,
+        shipname: 'shipanme2',
+        callsign: 'WTF2222',
 		lat: initialLat - 6/60,
 		lon: initialLon - 10/60,
 		cog: 90,
 		sog: 10,
+        navstatus: 0
 }
 
-targets['333333333'] = {
-		mmsi: '333333333',
+targets[333333333] = {
+		mmsi: 333333333,
+        shipname: 'shipanme3',
+        callsign: 'WTF3333',
 		lat: initialLat + 10/60,
 		lon: initialLon - 10/60,
 		cog: 135,
 		sog: 25,
+        navstatus: 0
 }
 
 // for testing
@@ -61,8 +70,8 @@ targets['333333333'] = {
 // console.log(targets);
 
 // SART/MOB/EPIRB target:
-targets['970111111'] = {
-		mmsi: '970111111',
+targets[970111111] = {
+		mmsi: 970111111,
 		lat: initialLat + 1/60,
 		lon: initialLon - 2/60,
 		cog: 0,
@@ -150,35 +159,49 @@ setInterval(function(){
     for (var mmsi in targets) {
         var target = targets[mmsi];
 
-        // encode AIS message
+        // encode AIS message - type 01: Position Report Class A
         var encMsg = new AisEncode({
-            aistype    : 3,
+            aistype    : 1,
             mmsi       : target.mmsi,
             lat: target.lat,
             lon: target.lon,
             cog: target.cog,
             sog: target.sog,
-            navstatus: target.navstatus
+            navstatus: target.navstatus,
         }); 
         
         // console.log(encMsg,encMsg.valid,encMsg.nmea);
         if (encMsg.valid) message += encMsg.nmea + '\n';
 
-        // encode AIS message
+        // encode AIS message - type 05: Static and Voyage Related Data
         var encMsg = new AisEncode ({
-            aistype    : 5,
+            aistype    : 24,
+            part       : 0,
             mmsi       : target.mmsi,
-            callsign: target.callsign,
-            shipname: target.shipname,
-            cargo: target.cargo,
+            shipname   : target.shipname
         }); 
         
+        // console.log(encMsg,encMsg.valid,encMsg.nmea);
+        if (encMsg.valid) message += encMsg.nmea + '\n';
+
+        var encMsg = new AisEncode ({
+            aistype    : 24,
+            part       : 1,
+            mmsi       : target.mmsi,
+            callsign   : target.callsign,
+            cargo      : 60,
+            dimA       : 0,
+            dimB       : 15,
+            dimC       : 0,
+            dimD       : 5
+        }); 
+
         // console.log(encMsg,encMsg.valid,encMsg.nmea);
         if (encMsg.valid) message += encMsg.nmea + '\n';
     }
     
     broadcast(message);
-    //console.log(message + '\n\n');
+    console.log(message + '\n\n');
     
     //console.log(gps);
 
