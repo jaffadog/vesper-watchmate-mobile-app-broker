@@ -602,32 +602,32 @@ app.get('/datamodel/getModel', (req, res) => {
     
     // GET /datamodel/getModel?DeviceModel
     if (req.query.DeviceModel==='') {
-    	res.send( new Buffer(getDeviceModelXml(),'latin1') );
+    	res.send( new Buffer.from(getDeviceModelXml(),'latin1') );
     } 
     
     // GET /datamodel/getModel?GPSModel
     else if (req.query.GPSModel==='') {
-    	res.send( new Buffer(getGpsModelXml(),'latin1') );
+    	res.send( new Buffer.from(getGpsModelXml(),'latin1') );
     } 
     
     // GET /datamodel/getModel?GPSModel.,Advanced
     else if (req.query["GPSModel.,Advanced"]==='') {
-    	res.send( new Buffer(getGpsModelAdvancedXml(),'latin1') );
+    	res.send( new Buffer.from(getGpsModelAdvancedXml(),'latin1') );
     } 
     
     // GET /datamodel/getModel?TxStatus
     else if (req.query.TxStatus==='') {
-    	res.send( new Buffer(getTxStatusModelXml(),'latin1') );
+    	res.send( new Buffer.from(getTxStatusModelXml(),'latin1') );
     } 
     
     // GET /datamodel/getModel?AnchorWatch
     else if (req.query.AnchorWatch==='') {
-    	res.send( new Buffer(getAnchorWatchModelXml(),'latin1') );
+    	res.send( new Buffer.from(getAnchorWatchModelXml(),'latin1') );
     } 
 
     // GET /datamodel/getModel?OwnStaticData
     else if (req.query.OwnStaticData==='') {
-        res.send( new Buffer(getOwnStaticDataXml(),'latin1') );
+        res.send( new Buffer.from(getOwnStaticDataXml(),'latin1') );
     }
     
     // unexpected request
@@ -640,7 +640,7 @@ app.get('/datamodel/getModel', (req, res) => {
 
 // GET /prefs/getPreferences?accept.demo_mode&profile.current
 app.get('/prefs/getPreferences', (req, res) => {
-    res.send( new Buffer(getPreferencesXml(),'latin1') );
+    res.send( new Buffer.from(getPreferencesXml(),'latin1') );
 });
 
 // GET /prefs/setPreferences?profile.current=OFFSHORE
@@ -648,7 +648,7 @@ app.get('/prefs/setPreferences', (req, res) => {
     if (req.query["profile.current"]) {
         collisionProfiles.current = req.query["profile.current"].toLowerCase();
         saveCollisionProfiles();
-        res.send( new Buffer(getPreferencesXml(),'latin1') );
+        res.send( new Buffer.from(getPreferencesXml(),'latin1') );
     }
     
     else {
@@ -665,28 +665,28 @@ app.get('/alarms/mute_alarm', (req, res) => {
 
 // GET /alarms/get_current_list
 app.get('/alarms/get_current_list', (req, res) => {
-    res.send( new Buffer(getAlarmsXml(),'latin1') );
+    res.send( new Buffer.from(getAlarmsXml(),'latin1') );
 });
 
 // GET /test/getSimFiles
 app.get('/test/getSimFiles', (req, res) => {
-    res.send( new Buffer(getSimsXml(),'latin1') );
+    res.send( new Buffer.from(getSimsXml(),'latin1') );
 });
 
 // GET /targets/getTargets
 app.get('/targets/getTargets', (req, res) => {
-    res.send( new Buffer(getTargetsXml(),'latin1') );
+    res.send( new Buffer.from(getTargetsXml(),'latin1') );
 });
 
 // GET /targets/getTargetDetails?MMSI=255805923
 app.get('/targets/getTargetDetails', (req, res) => {
     var mmsi = req.query.MMSI;
-    res.send( new Buffer(getTargetDetails(mmsi),'latin1') );
+    res.send( new Buffer.from(getTargetDetails(mmsi),'latin1') );
 });
 
 // GET /v3/watchMate/collisionProfiles
 app.get('/v3/watchMate/collisionProfiles', (req, res) => {
-    res.send( new Buffer(getCollisionProfilesJson(),'latin1') );
+    res.send( new Buffer.from(getCollisionProfilesJson(),'latin1') );
 });
 
 // PUT /v3/watchMate/collisionProfiles
@@ -700,7 +700,7 @@ app.put('/v3/watchMate/collisionProfiles', (req, res) => {
 
 // GET /prefs/start_notifying - "Hello" 200 text/html
 app.get('/prefs/start_notifying', (req, res) => {
-    res.send( new Buffer('Hello','latin1') );
+    res.send( new Buffer.from('Hello','latin1') );
 });
 
 // FIXME: add
