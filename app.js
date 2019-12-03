@@ -52,7 +52,7 @@ const xmitInterval = 1000;
 
 // FIXME: these are point of config... maybe use properties file.. or command
 // line parameters
-const aisHostname = '127.0.0.1';
+const aisHostname = 'raspberrypi0.local';
 const aisPort = 39150;
 
 var gps = {};
@@ -951,13 +951,24 @@ function connect() {
     });
 
     socket.on("data", chunk => {
-        console.log("Received: " + chunk);
+        //console.log("Received: " + chunk);
         data += chunk;
-    });
+        
+        var eol = data.indexOf('\n');
+        
+        while (eol > -1) {
+            try {
+                var nmeaMessage = data.substring(0, eol);
+                console.log('nmeaMessage',nmeaMessage);
+                processReceivedAisData(nmeaMessage);
+            }
+            catch (err) {
+                console.log('error', err.message);
+            }
 
-    socket.on("end",() => {
-        console.log("End: " + data);
-        // processReceivedAisData(data);
+            data = data.substring(eol + 1);
+            eol = data.indexOf('\n');
+        }
     });
 
     socket.on("close", () => {
