@@ -940,6 +940,8 @@ let socket = new net.Socket()
 // FIXME: humm... ok
 socket.setEncoding('latin1');
 
+var data = '';
+
 function connect() {
     console.log("new socket");
     
@@ -948,9 +950,14 @@ function connect() {
         // socket.write("Hello, server! Love, socket.")
     });
 
-    socket.on("data", data => {
-        console.log("Received: " + data);
-        processReceivedAisData(data);
+    socket.on("data", chunk => {
+        console.log("Received: " + chunk);
+        data += chunk;
+    });
+
+    socket.on("end" => {
+        console.log("End: " + data);
+        // processReceivedAisData(data);
     });
 
     socket.on("close", () => {
