@@ -960,9 +960,9 @@ function connect() {
         
         while (eol > -1) {
             try {
-                var nmeaMessage = data.substring(0, eol);
+                var aisMessage = data.substring(0, eol).toString('latin1');
                 //console.log('nmeaMessage',nmeaMessage);
-                processReceivedAisData(nmeaMessage);
+                processAisMessage(aisMessage);
             }
             catch (err) {
                 console.log('error', err.message);
@@ -989,26 +989,19 @@ function connect() {
     });
 }
 
-function processReceivedAisData(data) {
-    var dataString = data.toString('latin1');
-    // split on carriage returns and lines feeds
-    var lines = dataString.split(/\r\n|\r|\n/g);
+function processAisMessage(aisMessage) {
     
-    for (var line of lines) {
-        processAIScommand(line);
-    }
-}
-
-function processAIScommand(line) {
-    
-    // console.log('processAIScommand',line);
+    // console.log('processAIScommand',aisMessage);
 
     // decode and AIS message
-    if (line.startsWith('!AI')) { 
-        var decMsg = new AisDecode (line, aisSession);
+    if (aisMessage.startsWith('!AI')) { 
+        var decMsg = new AisDecode (aisMessage, aisSession);
         // console.log ('%j', decMsg);
 
-        if (decMsg.valid && decMsg.mmsi) {
+        // ignore if not valid, no mmsi, or is my mmsi
+        if (!decMsg.valid || !decMsg.mmsi || decMsg.mmsi === myMmsi) {
+            return;
+        }
     	
     	var target = targets[decMsg.mmsi];
     	
@@ -1110,13 +1103,11 @@ function processAIScommand(line) {
     	// console.log('target',target);
     	// console.log('targets',targets);
 
-        }
-
     }
     
     // decode NMEA message
-    if (line.startsWith('$GP')) {
-        var decMsg = new NmeaDecode (line);
+    if (aisMessage.startsWith('$GP')) {
+        var decMsg = new NmeaDecode (aisMessage);
         // console.log ('%j', decMsg);
         
 	    // FIXME: add GPS accuracy and satellite data... meh
