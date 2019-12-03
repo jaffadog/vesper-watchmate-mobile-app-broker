@@ -1,3 +1,117 @@
+
+=============================
+
+Recommended Minimum:
+$GPRMC,161022.00,A,3733.09996,N,07618.47187,W,0.049,91.62,031219,10.98,W,A*34
+
+Velocity made good:
+$GPVTG,91.62,T,102.61,M,0.049,N,0.091,K,A*1E
+
+3D location and accuracy data:
+$GPGGA,161022.00,3733.09996,N,07618.47187,W,1,08,1.24,23.7,M,-35.6,M,,*52
+
+$GPGGA,         1   Global Positioning System Fix Data
+161022.00,      2   time
+3733.09996,     3   lat
+N,              4   lat
+07618.47187,    5   lon
+W,              6   lon
+1,              7   Fix quality
+08,             8   Number of satellites being tracked
+1.24,           9   Horizontal dilution of position
+23.7,           10  Altitude, Meters, above mean sea level
+M,              11  Altitude, Meters, above mean sea level
+-35.6,          12  Height of geoid (mean sea level) above WGS84
+M,              13  Height of geoid (mean sea level) above WGS84
+,               14  time in seconds since last DGPS update
+*52
+
+
+GPS DOP and active satellites:
+$GPGSA,A,3,32,15,24,20,21,10,27,13,,,,,1.84,1.24,1.36*08
+
+Satellites in View:
+$GPGSV,3,1,09,08,01,325,,10,38,306,40,13,08,052,11,15,39,053,29*7A
+$GPGSV,3,2,09,20,66,329,36,21,64,220,23,24,60,115,39,27,13,295,26*7C
+$GPGSV,3,3,09,32,20,247,36*47
+
+Geographic Latitude and Longitude:
+$GPGLL,3733.09996,N,07618.47187,W,161022.00,A,A*73
+
+Position error statistics:
+$GPGST,161022.00,40,,,,2.9,3.0,7.8*52
+
+---
+
+these may be vesper proprietary messages:
+
+dunno:
+$PVSP,ATS,A,161975,T,-110,12057,908*6A
+$PVSP,ATS,B,162025,T,-111,11067,911*6F
+
+dunno:
+$PVSP,TXW,00000040*5A
+
+vhf antenna vswr:
+$PVSP,VSWR,10,248*16
+
+maybe nmea port data/config:
+$PVSP,IOP,0,38400,15*58
+$PVSP,IOP,1,38400,0*6D
+$PVSP,IOP,2,38400,15*5A
+$PVSP,IOP,3,4800,0*5C
+
+=============================
+
+Recommended Minimum:
+
+{"nmea":["$GPRMC","175841.00","A","3733.10199","N","07618.47404","W","0.113","91.62","031219","10.98","W","A*33\r"],
+"valid":true,"cmd":2,"mssi":0,"time":"175841.00","lat":37.55169983333334,"lon":-76.30790066666667,"sog":0,"cog":91.62,"day":"031219","alt":10.98,"date":1071856721000}
+
+Where:
+     RMC          Recommended Minimum sentence C
+     123519       Fix taken at 12:35:19 UTC
+     A            Status A=active or V=Void.
+     4807.038,N   Latitude 48 deg 07.038' N
+     01131.000,E  Longitude 11 deg 31.000' E
+     022.4        Speed over the ground in knots
+     084.4        Track angle in degrees True
+     230394       Date - 23rd of March 1994
+     003.1,W      Magnetic Variation
+     *6A          The checksum data, always begins with *
+
+3D location and accuracy data:
+
+{"nmea":["$GPGGA","175841.00","3733.10199","N","07618.47404","W","1","09","1.11","8.2","M","-35.6","M","","*60\r"],
+"valid":true,"cmd":2,"mssi":0,"time":"175841.00","lat":37.55169983333334,"lon":-76.30790066666667,"sog":4.6,"cog":1.11,"alt":8.2,"date":1575395921207}
+
+Where:
+     GGA          Global Positioning System Fix Data
+     123519       Fix taken at 12:35:19 UTC
+     4807.038,N   Latitude 48 deg 07.038' N
+     01131.000,E  Longitude 11 deg 31.000' E
+     1            Fix quality: 0 = invalid
+                               1 = GPS fix (SPS)
+                               2 = DGPS fix
+                               3 = PPS fix
+                   4 = Real Time Kinematic
+                   5 = Float RTK
+                               6 = estimated (dead reckoning) (2.3 feature)
+                   7 = Manual input mode
+                   8 = Simulation mode
+     08           Number of satellites being tracked
+     0.9          Horizontal dilution of position
+     545.4,M      Altitude, Meters, above mean sea level
+     46.9,M       Height of geoid (mean sea level) above WGS84
+                      ellipsoid
+     (empty field) time in seconds since last DGPS update
+     (empty field) DGPS station ID number
+     *47          the checksum data, always begins with *
+
+=============================
+
+
+
 $GPGSV,3,1,10,03,38,283,31,14,50,118,29,16,49,202,27,22,40,254,31*70
 $GPGSV,3,2,10,23,19,311,21,25,02,041,31,26,80,174,36,29,20,061,29*7C
 $GPGSV,3,3,10,31,54,045,35,32,26,128,45*73

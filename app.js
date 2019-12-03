@@ -1106,9 +1106,10 @@ function processAisMessage(aisMessage) {
     }
     
     // decode NMEA message
-    if (aisMessage.startsWith('$GP')) {
+    if (aisMessage.startsWith('$GPRMC')) {
         var decMsg = new NmeaDecode (aisMessage);
-        // console.log ('%j', decMsg);
+        //console.log ('ribbit');
+        console.log ('%j', decMsg);
         
 	    // FIXME: add GPS accuracy and satellite data... meh
 		
@@ -1117,7 +1118,24 @@ function processAisMessage(aisMessage) {
             	gps.lat = decMsg.lat;
             	gps.lon = decMsg.lon;
             	gps.magvar = Magvar.Get(gps.lat, gps.lon);
-            	gps.lastFix = new Date().toISOString();
+            	
+            	// 194431.00   hhmmss
+            	// 031219      ddmmyy
+            	
+            	gps.lastFix = new Date(Date.UTC(
+                        '20' + decMsg.day.substring(4,6),
+                        decMsg.day.substring(2,4) - 1,
+                        decMsg.day.substring(0,2),
+                        decMsg.time.substring(0,2),
+                        decMsg.time.substring(2,4),
+                        decMsg.time.substring(4,6)
+                )).toISOString();
+            	
+            	//console.log('gps.lastFix',decMsg.day,decMsg.time,new Date(decMsg.date).toISOString(),gps.lastFix);
+            	
+                //gps.lastFix = decMsg.date.toISOString();
+                // decMsg.time is hhmmss utc... would need to be processed
+                //gps.lastFix = new Date(decMsg.time).toISOString();
             }
 	
             if (decMsg.cog !== undefined) {
@@ -1125,12 +1143,13 @@ function processAisMessage(aisMessage) {
             }
 
             if (decMsg.sog !== undefined) {
-                gps.sog = parseFloat(decMsg.nmea[7])
+                gps.sog = decMsg.sog;
+                //gps.sog = parseFloat(decMsg.nmea[7])
                 // decMsg.sog; this is actually m/s with 1 decimal place... not
                 // what we want. so we grab the raw nmea value above
             }
 
-            // console.log('gps',gps);
+            console.log('gps',gps);
         }
         
     }
