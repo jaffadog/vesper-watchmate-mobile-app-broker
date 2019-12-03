@@ -402,8 +402,8 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <OwnStaticData>
 <MMSI>${myMmsi}</MMSI>
-<Name>UNKNOWN</Name>
-<CallSign>UNKNOWN</CallSign>
+<Name>MYNAME</Name>
+<CallSign>MYCALLSIGN</CallSign>
 <VesselType>36</VesselType>
 <VesselSize a='1' b='2' c='3' d='4'/>
 </OwnStaticData>
