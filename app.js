@@ -1109,7 +1109,7 @@ function processAisMessage(aisMessage) {
     if (aisMessage.startsWith('$GPRMC')) {
         var decMsg = new NmeaDecode (aisMessage);
         //console.log ('ribbit');
-        console.log ('%j', decMsg);
+        //console.log ('%j', decMsg);
         
 	    // FIXME: add GPS accuracy and satellite data... meh
 		
@@ -1149,7 +1149,7 @@ function processAisMessage(aisMessage) {
                 // what we want. so we grab the raw nmea value above
             }
 
-            console.log('gps',gps);
+            //console.log('gps',gps);
         }
         
     }
