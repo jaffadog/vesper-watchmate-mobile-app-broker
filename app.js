@@ -955,7 +955,7 @@ function connect() {
         data += chunk;
     });
 
-    socket.on("end" => {
+    socket.on("end",() => {
         console.log("End: " + data);
         // processReceivedAisData(data);
     });
