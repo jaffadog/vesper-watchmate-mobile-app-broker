@@ -50,6 +50,8 @@ const httpPort = 39151;
 
 const xmitInterval = 1000;
 
+const myMmsi = '338327565';
+
 // FIXME: these are point of config... maybe use properties file.. or command
 // line parameters
 const aisHostname = 'raspberrypi0.local';
@@ -399,9 +401,9 @@ function getOwnStaticDataXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <OwnStaticData>
-<MMSI>111111111</MMSI>
+<MMSI>${myMmsi}</MMSI>
 <Name>UNKNOWN</Name>
-<CallSign></CallSign>
+<CallSign>UNKNOWN</CallSign>
 <VesselType>36</VesselType>
 <VesselSize a='1' b='2' c='3' d='4'/>
 </OwnStaticData>
@@ -959,7 +961,7 @@ function connect() {
         while (eol > -1) {
             try {
                 var nmeaMessage = data.substring(0, eol);
-                console.log('nmeaMessage',nmeaMessage);
+                //console.log('nmeaMessage',nmeaMessage);
                 processReceivedAisData(nmeaMessage);
             }
             catch (err) {
