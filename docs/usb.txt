@@ -1,0 +1,35 @@
+
+jeremy@Jeremys-MBP:~$ ll /dev/cu.usb*
+crw-rw-rw-  1 root  wheel   21,  15 Nov 30 19:57 /dev/cu.usbserial-VESPERMARINE
+
+screen /dev/cu.usbserial-VESPERMARINE 38400
+
+ctrl a d
+ctrl a ctrl d
+
+ctrl+d command or type exit
+
+
+pi@raspberrypi0:~ $ ll /dev/*USB*
+crw-rw---- 1 root dialout 188, 0 Nov 30 20:20 /dev/ttyUSB0
+
+sudo apt-get install screen
+
+screen /dev/ttyUSB0 38400
+
+
+mac:
+
+stty -f /dev/cu.usbserial-VESPERMARINE 38400
+
+nc -l 39150 </dev/cu.usbserial-VESPERMARINE >/dev/cu.usbserial-VESPERMARINE
+
+stty -f /dev/cu.usbserial-VESPERMARINE 38400;nc -l 39150 </dev/cu.usbserial-VESPERMARINE >/dev/cu.usbserial-VESPERMARINE
+
+
+listen:
+nc -l 39150
+
+
+... or just use ser2net :)
+

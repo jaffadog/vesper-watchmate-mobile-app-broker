@@ -1,0 +1,11 @@
+
+install node js v10
+
+git clone https://github.com/jaffadog/vesper-watchmate-mobile-app-broker.git
+
+cd vesper-watchmate-mobile-app-broker
+
+npm install
+
+run with:
+node app.js

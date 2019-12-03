@@ -43,7 +43,9 @@ catch (err) {
 const ageOldTargets = true;
 const ageOldTargetsTTL = 20;
 
-const tcpPort = 39150;
+const nmeaServerEnabled = false;
+const nmeaServerPort = 39150;
+
 const httpPort = 39151;
 
 const xmitInterval = 1000;
@@ -51,7 +53,7 @@ const xmitInterval = 1000;
 // FIXME: these are point of config... maybe use properties file.. or command
 // line parameters
 const aisHostname = '127.0.0.1';
-const aisPort = 3000;
+const aisPort = 39150;
 
 var gps = {};
 var targets = {};
@@ -760,172 +762,175 @@ app.get('*', function(req, res) {
 
 app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort}!`));
 
-// ======================= TCP SERVER ========================
+// ======================= NMEA SERVER ========================
 // listens to requests from mobile app
 
-var connectionNumber = 0;
-let connections = [];
+if (nmeaServerEnabled) {
 
-try {
-	const tcpServer = net.createServer((connection) => {
-	    
-	    connectionNumber++;
-	    connection.id = connectionNumber;
-	    connections.push(connection);
-	    
-	    console.log(`TCP Server: new connection ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
-	    console.log('connections',connections.length);
-	    
-	    connection.on('data', data => {
-	        console.log(`TCP Server: connection ${connection.id} DATA ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
-	    });
-
-	    connection.on('close', () => {
-	        console.log(`TCP Server: connection ${connection.id} CLOSE ${connection.remoteAddress}:${connection.remotePort}`);
-	        connections.splice(connections.indexOf(connection), 1);
-	        console.log('connections',connections.length);
-	    });
-	    
-	    connection.on('end', () => {
-	        console.log(`TCP Server: connection ${connection.id} END ${connection.remoteAddress}:${connection.remotePort}`);
-	        // connections.splice(connections.indexOf(connection), 1);
-	        console.log('connections',connections.length);
-	    });
-	    
-	    connection.on('error', err => {
-	        console.log(`****** TCP Server: connection ${connection.id} ERROR`);
-	        console.log(err,err.stack);
-	    });
-	    
-	    
-	});
-
-	tcpServer.on('error', (err) => {
-	    console.log('TCP Server: whoops!',err);
-	    // console.error;
-	    // throw err;
-	});
-
-	tcpServer.listen(tcpPort, () => {
-	    console.log(`TCP Server: listening on ${tcpServer.address().address}:${tcpServer.address().port}`);
-	});
-}
-catch (err) {
-    console.log('error in tcp server',err.message)
-}
-
-function broadcast(msg) {
+    var connectionNumber = 0;
+    let connections = [];
+    
     try {
-    	connections.map(connection => {
-    		connection.write(msg);
-        });
+    	const nmeaServer = net.createServer((connection) => {
+    	    
+    	    connectionNumber++;
+    	    connection.id = connectionNumber;
+    	    connections.push(connection);
+    	    
+    	    console.log(`NMEA Server: new connection ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
+    	    console.log('connections',connections.length);
+    	    
+    	    connection.on('data', data => {
+    	        console.log(`NMEA Server: connection ${connection.id} DATA ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
+    	    });
+    
+    	    connection.on('close', () => {
+    	        console.log(`NMEA Server: connection ${connection.id} CLOSE ${connection.remoteAddress}:${connection.remotePort}`);
+    	        connections.splice(connections.indexOf(connection), 1);
+    	        console.log('connections',connections.length);
+    	    });
+    	    
+    	    connection.on('end', () => {
+    	        console.log(`NMEA Server: connection ${connection.id} END ${connection.remoteAddress}:${connection.remotePort}`);
+    	        // connections.splice(connections.indexOf(connection), 1);
+    	        console.log('connections',connections.length);
+    	    });
+    	    
+    	    connection.on('error', err => {
+    	        console.log(`****** NMEA Server: connection ${connection.id} ERROR`);
+    	        console.log(err,err.stack);
+    	    });
+    	    
+    	    
+    	});
+    
+    	nmeaServer.on('error', (err) => {
+    	    console.log('NMEA Server: whoops!',err);
+    	    // console.error;
+    	    // throw err;
+    	});
+    
+    	nmeaServer.listen(nmeaServerPort, () => {
+    	    console.log(`NMEA Server: listening on ${nmeaServer.address().address}:${nmeaServer.address().port}`);
+    	});
     }
     catch (err) {
-        console.log('error in broadcast',err.message)
+        console.log('error in NMEA server',err.message)
     }
+    
+    function broadcast(msg) {
+        try {
+        	connections.map(connection => {
+        		connection.write(msg);
+            });
+        }
+        catch (err) {
+            console.log('error in broadcast',err.message)
+        }
+    }
+    
+    // $GPRMC = Recommended minimum specific GPS/Transit data
+    // $GPVTG = Track Made Good and Ground Speed
+    // $GPGGA = Global Positioning System Fix Data
+    // $GPGSA = GPS DOP and active satellites
+    // $GPGSV = GPS Satellites in view
+    // $GPGLL = Geographic Position, Latitude / Longitude and time
+    
+    // the app wants to see traffic on port 39150. if it does not, it will
+    // periodically reinitialize. i guess this is a mechanism to try and restore
+    // what it perceives as lost connectivity with the AIS unit. The app does
+    // not actually appear to use this data though - instead relying on getting
+    // everything it needs from the web interfaces.
+    
+    setInterval(function(){
+        console.log('start tcp xmit');
+        
+        var message = '';
+        
+        /*
+    	 * var data =
+    	 * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+    	 * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+    	 * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+    	 * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+    	 * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+    	 * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+    	 * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
+    	 */
+    
+        if (gps.lat === undefined 
+                || gps.lon === undefined
+                || gps.sog === undefined
+                || gps.cog === undefined) {
+            console.log('cant generate nmea gps message: missing data');
+            return;
+        } else {
+            // console.log('gps',gps);
+            // encode NMEA message
+            var nmeaMsg = new NmeaEncode({ 
+                // standard class B Position report
+                // msgtype : 18, <== NOTE: this breaks things!
+                lat        : gps.lat,
+                lon        : gps.lon,
+                cog        : gps.cog,
+                sog        : gps.sog
+            }); 
+            
+            // console.log(nmeaMsg,nmeaMsg.valid,nmeaMsg.nmea);
+            if (nmeaMsg.valid) message += nmeaMsg.nmea + '\n';
+        }
+        
+        // FIXME should we send the proper ais class A vs B message ?
+        
+        for (var mmsi in targets) {
+            var target = targets[mmsi];
+    
+            // encode AIS message
+            var encMsg = new AisEncode({
+                aistype    : 3,
+                mmsi       : target.mmsi,
+                lat: target.lat,
+                lon: target.lon,
+                cog: target.cog,
+                sog: target.sog,
+                navstatus: target.navstatus
+            }); 
+            
+            // console.log(encMsg,encMsg.valid,encMsg.nmea);
+            if (encMsg.valid) message += encMsg.nmea + '\n';
+    
+            // encode AIS message
+            var encMsg = new AisEncode ({
+                aistype    : 5,
+                mmsi       : target.mmsi,
+                callsign: target.callsign,
+                shipname: target.shipname,
+                cargo: target.cargo,
+            }); 
+            
+            // console.log(encMsg,encMsg.valid,encMsg.nmea);
+            if (encMsg.valid) message += encMsg.nmea + '\n';
+        }
+        
+        broadcast(message);
+        
+    // message =
+    // `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+    // $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+    // $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+    // $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+    // $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+    // $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+    // $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75
+    // `;
+    //    
+    // broadcast(message);
+    
+        
+    
+    }, xmitInterval);
+
 }
-
-// $GPRMC = Recommended minimum specific GPS/Transit data
-// $GPVTG = Track Made Good and Ground Speed
-// $GPGGA = Global Positioning System Fix Data
-// $GPGSA = GPS DOP and active satellites
-// $GPGSV = GPS Satellites in view
-// $GPGLL = Geographic Position, Latitude / Longitude and time
-
-// the app wants to see traffic on port 39150. if it does not, it will
-// periodically reinitialize. i guess this is a mechanism to try and restore
-// what it perceives as lost connectivity with the AIS unit. The app does
-// not actually appear to use this data though - instead relying on getting
-// everything it needs from the web interfaces.
-
-setInterval(function(){
-    console.log('start tcp xmit');
-    
-    var message = '';
-    
-    /*
-	 * var data =
-	 * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-	 * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-	 * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-	 * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-	 * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-	 * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-	 * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
-	 */
-
-    if (gps.lat === undefined 
-            || gps.lon === undefined
-            || gps.sog === undefined
-            || gps.cog === undefined) {
-        console.log('cant generate nmea gps message: missing data');
-        return;
-    } else {
-        // console.log('gps',gps);
-        // encode NMEA message
-        var nmeaMsg = new NmeaEncode({ 
-            // standard class B Position report
-            // msgtype : 18, <== NOTE: this breaks things!
-            lat        : gps.lat,
-            lon        : gps.lon,
-            cog        : gps.cog,
-            sog        : gps.sog
-        }); 
-        
-        // console.log(nmeaMsg,nmeaMsg.valid,nmeaMsg.nmea);
-        if (nmeaMsg.valid) message += nmeaMsg.nmea + '\n';
-    }
-    
-    // FIXME should we send the proper ais class A vs B message ?
-    
-    for (var mmsi in targets) {
-        var target = targets[mmsi];
-
-        // encode AIS message
-        var encMsg = new AisEncode({
-            aistype    : 3,
-            mmsi       : target.mmsi,
-            lat: target.lat,
-            lon: target.lon,
-            cog: target.cog,
-            sog: target.sog,
-            navstatus: target.navstatus
-        }); 
-        
-        // console.log(encMsg,encMsg.valid,encMsg.nmea);
-        if (encMsg.valid) message += encMsg.nmea + '\n';
-
-        // encode AIS message
-        var encMsg = new AisEncode ({
-            aistype    : 5,
-            mmsi       : target.mmsi,
-            callsign: target.callsign,
-            shipname: target.shipname,
-            cargo: target.cargo,
-        }); 
-        
-        // console.log(encMsg,encMsg.valid,encMsg.nmea);
-        if (encMsg.valid) message += encMsg.nmea + '\n';
-    }
-    
-    broadcast(message);
-    
-// message =
-// `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-// $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-// $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-// $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-// $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-// $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-// $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75
-// `;
-//    
-// broadcast(message);
-
-    
-
-}, xmitInterval);
-    
 
 // ======================= TCP CLIENT ========================
 // gets data from AIS
