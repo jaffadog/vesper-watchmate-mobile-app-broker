@@ -1514,7 +1514,7 @@ function evaluateAlarms(target) {
 
     // sort closer targets to top
     if (target.range > 0) {
-        target.order -= target.range);
+        target.order -= target.range;
     }
 
 }
