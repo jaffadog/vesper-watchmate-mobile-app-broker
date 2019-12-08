@@ -1501,7 +1501,7 @@ function evaluateAlarms(target) {
         // weighting)
         // tcpa of 60 minutes reduces order by 0
         var weight = 1000;
-        target.order -= Math.min(0, Math.round(weight - weight/3600*target.tcpa));
+        target.order -= Math.max(0, Math.round(weight - weight*target.tcpa/3600));
     }
 
     // sort closer cpa targets to top
@@ -1509,12 +1509,12 @@ function evaluateAlarms(target) {
         // cpa of 0 nm reduces order by 2000 (this is an arbitrary weighting)
         // cpa of 5 nm reduces order by 0
         var weight = 2000;
-        target.order -= Math.min(0, Math.round(weight - weight/5*target.cpa));
+        target.order -= Math.max(0, Math.round(weight - weight*target.cpa/5));
     }
 
     // sort closer targets to top
     if (target.range > 0) {
-        target.order += Math.round(10*target.range);
+        target.order += Math.round(100*target.range);
     }
 
 }
