@@ -1495,19 +1495,26 @@ function evaluateAlarms(target) {
 
     target.alarmType = alarms.join(',');
 
+    // sort sooner tcpa targets to top
     if (target.tcpa > 0) {
         // tcpa of 0 seconds reduces order by 1000 (this is an arbitrary
         // weighting)
         // tcpa of 60 minutes reduces order by 0
         var weight = 1000;
-        target.order -= Math.round(weight - weight/3600*target.tcpa);
+        target.order -= Math.min(0, Math.round(weight - weight/3600*target.tcpa));
     }
 
+    // sort closer cpa targets to top
     if (target.cpa > 0) {
         // cpa of 0 nm reduces order by 2000 (this is an arbitrary weighting)
         // cpa of 5 nm reduces order by 0
         var weight = 2000;
-        target.order -= Math.round(weight - weight/5*target.cpa);
+        target.order -= Math.min(0, Math.round(weight - weight/5*target.cpa));
+    }
+
+    // sort closer targets to top
+    if (target.range > 0) {
+        target.order -= target.range);
     }
 
 }
