@@ -1350,7 +1350,7 @@ function updateCpa(target) {
 	// the tracks are almost parallel
 	// or there is almost no relative movement
 	if (dv2 < 0.00000001) {
-        console.log('cant calc tcpa: ',target.mmsi);
+        //console.log('cant calc tcpa: ',target.mmsi);
         target.cpa = undefined;
         target.tcpa = undefined;
         return;
@@ -1366,8 +1366,9 @@ function updateCpa(target) {
 	// in hours
 	var tcpa = -dot(w0,dv) / dv2;
 	
-    if (!tcpa) {
-        console.log('cant calc tcpa: ',target.mmsi);
+	// if tcpa is in the past, then dont calc cpa & tcpa
+    if (!tcpa || tcpa < 0) {
+        //console.log('cant calc tcpa: ',target.mmsi);
         target.cpa = undefined;
         target.tcpa = undefined;
         return;
@@ -1497,6 +1498,8 @@ function evaluateAlarms(target) {
 
     // sort sooner tcpa targets to top
     if (target.tcpa > 0) {
+        // sort vessels with any tcpa above vessels that dont have a tcpa
+        target.order -= 1000;
         // tcpa of 0 seconds reduces order by 1000 (this is an arbitrary
         // weighting)
         // tcpa of 60 minutes reduces order by 0
@@ -1515,6 +1518,11 @@ function evaluateAlarms(target) {
     // sort closer targets to top
     if (target.range > 0) {
         target.order += Math.round(100*target.range);
+    }
+
+    // sort targets with no range to bottom
+    if (target.range === undefined) {
+        target.order += 99999;
     }
 
 }
