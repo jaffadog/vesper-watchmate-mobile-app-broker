@@ -54,6 +54,7 @@ const myMmsi = '338327565';
 
 // FIXME: these are point of config... maybe use properties file.. or command
 // line parameters
+// where should we get ais/gps nmea data from?
 const aisHostname = 'raspberrypi0.local';
 const aisPort = 39150;
 
@@ -415,13 +416,15 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <Prefs>
 <PrefsRequested>
-{2,{"accept.demo_mode",""},{"profile.current","${collisionProfiles.current.toUpperCase()}"}}
+{2,{"accept.demo_mode",""},{"profile.current",""}}
 </PrefsRequested>
 <Pref prefname='accept.demo_mode'>0</Pref>
 <Pref prefname='profile.current'>${collisionProfiles.current.toUpperCase()}</Pref>
 </Prefs>
 </Watchmate>`;
 }
+
+// {2,{"accept.demo_mode",""},{"profile.current","${collisionProfiles.current.toUpperCase()}"}}
 
 // FIXME: should this return an empty body if there are no alarms?
 // or an empty <Alarm/>
@@ -441,7 +444,7 @@ function getAlarmsXml() {
 <Name>${target.name||''}</Name>
 <COG>${formatCog(target.cog)}</COG>
 <SOG>${formatSog(target.sog)}</SOG>
-<CPA>${formatCpa(target.cpa)}</CPA>
+<CPA>${formatCpa(target.cpa, target.tcpa)}</CPA>
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
 <Range>${formatRange(target.range)}</Range>
 <BearingTrue>${target.bearing||''}</BearingTrue>
@@ -486,7 +489,7 @@ function getTargetsXml() {
 <TargetType>${target.targetType||''}</TargetType>
 <Order>${target.order||''}</Order>
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
-<CPA>${formatCpa(target.cpa)}</CPA>
+<CPA>${formatCpa(target.cpa, target.tcpa)}</CPA>
 <Bearing>${target.bearing||''}</Bearing>
 <Range>${formatRange(target.range)}</Range>
 <COG2>${formatCog(target.cog)}</COG2>
@@ -536,7 +539,7 @@ function getTargetDetails(mmsi) {
 <TargetType>${target.targetType||''}</TargetType>
 <Order>${target.order||''}</Order>
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
-<CPA>${formatCpa(target.cpa)}</CPA>
+<CPA>${formatCpa(target.cpa, target.tcpa)}</CPA>
 <Bearing>${target.bearing||''}</Bearing>
 <Range>${formatRange(target.range)}</Range>
 <COG2>${formatCog(target.cog)}</COG2>
@@ -1088,15 +1091,15 @@ function processAisMessage(aisMessage) {
         }
         
         // target.targetType = 1;
-        // 1 = ship - pointy box
-        // 2 = triangle
-        // 3 = triangle
-        // 4 = diamond
-        // 5 = triangle
-        // 6 = circle/cross sart
-        // 7 = mob
-        // 8 = epirb
-        // 993 = aton
+        // 1 = ship - pointy box        class A
+        // 2 = triangle                 class B
+        // 3 = triangle                 ?
+        // 4 = diamond                  AToN
+        // 5 = triangle                 ?
+        // 6 = circle/cross sart        SART
+        // 7 = mob                      MOB
+        // 8 = epirb                    EPIRB
+        // 993 = aton                   AToN
 
     	targets[decMsg.mmsi] = target;
 
@@ -1106,9 +1109,9 @@ function processAisMessage(aisMessage) {
     }
     
     // decode NMEA message
+    // FIXME: only look at GPRMC msgs to work around ggencoder bug with GGA msgs
     if (aisMessage.startsWith('$GPRMC')) {
         var decMsg = new NmeaDecode (aisMessage);
-        //console.log ('ribbit');
         //console.log ('%j', decMsg);
         
 	    // FIXME: add GPS accuracy and satellite data... meh
@@ -1119,6 +1122,7 @@ function processAisMessage(aisMessage) {
             	gps.lon = decMsg.lon;
             	gps.magvar = Magvar.Get(gps.lat, gps.lon);
             	
+            	// FIXME: working around ggdecoder bug that returns incorrect date
             	// 194431.00   hhmmss
             	// 031219      ddmmyy
             	
@@ -1520,15 +1524,15 @@ function formatMagvar(magvar) {
     return magvar === undefined ? '' : magvar.toFixed(2);
 }
 
-function formatCpa(cpa) {
-    return cpa === undefined ? '' : cpa.toFixed(2);
+function formatCpa(cpa, tcpa) {
+    return cpa === undefined || tcpa === undefined || tcpa < 0 ? '' : cpa.toFixed(2);
 }
 
 function formatTcpa(tcpa) {
     // returns hh:mm:ss, e.g. 01:15:23
     // 012345678901234567890
     // 1970-01-01T00:00:07.000Z
-    if (tcpa === undefined) {
+    if (tcpa === undefined || tcpa<0) {
         return '';
     } 
     // when more than 60 mins, then format hh:mm:ss

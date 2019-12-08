@@ -14,3 +14,20 @@
 		<alarmTriggered></alarmTriggered>
 	</AnchorWatch>
 </Watchmate>
+
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+	<AnchorWatch>
+		<setAnchor>1</setAnchor>
+		<alarmRadius>30</alarmRadius>
+		<alarmsEnabled>1</alarmsEnabled>
+		<anchorLatitude>399510671</anchorLatitude>
+		<anchorLongitude>-751394869</anchorLongitude>
+		<anchorCorrectedLat></anchorCorrectedLat>
+		<anchorCorrectedLong></anchorCorrectedLong>
+		<usingCorrected>0</usingCorrected>
+		<distanceToAnchor>0</distanceToAnchor>
+		<bearingToAnchor>97</bearingToAnchor>
+		<alarmTriggered>0</alarmTriggered>
+	</AnchorWatch>
+</Watchmate>

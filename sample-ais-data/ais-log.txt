@@ -1,4 +1,19 @@
 
+watchmate app sends to vesper:
+
+when app first starts:
+$PVSP,KDGST,S*19
+$PVSP,QNEMOELEMS*23
+
+when going into xb-8000 menu:
+$AIAIQ,VSWR,1,1*7D
+$AIAIQ,TXW,1,1*26
+$AIAIQ,ATS,1,1*3B
+$AIAIQ,IOP,1,1*2B
+
+
+
+
 =============================
 
 Recommended Minimum:
@@ -43,13 +58,15 @@ $GPGST,161022.00,40,,,,2.9,3.0,7.8*52
 
 ---
 
-these may be vesper proprietary messages:
+these are vesper proprietary messages:
 
-dunno:
+radio status; chan A; chan B
+freq, mode, rssi, rx count, tx count
+below looks like chan, freq, rssi, rx, tx
 $PVSP,ATS,A,161975,T,-110,12057,908*6A
 $PVSP,ATS,B,162025,T,-111,11067,911*6F
 
-dunno:
+dunno. maybe transmit enabled/disabled?
 $PVSP,TXW,00000040*5A
 
 vhf antenna vswr:

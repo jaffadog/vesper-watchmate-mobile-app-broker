@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<p>GET /alarms/get_current_list</p>
+<div id="result1"></div>
+
+
+<p>Listening for streaming data from http://192.168.15.1:39151/v3/openChannel</p>
+<div id="result2"></div>
+
+<script>
+/* 
+//Create the XHR object.
+function createCORSRequest(method, url) {
+  var xhr = new XMLHttpRequest();
+  if ("withCredentials" in xhr) {
+    // XHR for Chrome/Firefox/Opera/Safari.
+    xhr.open(method, url, true);
+  } else if (typeof XDomainRequest != "undefined") {
+    // XDomainRequest for IE.
+    xhr = new XDomainRequest();
+    xhr.open(method, url);
+  } else {
+    // CORS not supported.
+    xhr = null;
+  }
+  return xhr;
+}
+
+// Helper method to parse the title tag from the response.
+function getTitle(text) {
+  return text.match('<title>(.*)?</title>')[1];
+}
+
+// Make the actual CORS request.
+function makeCorsRequest() {
+  // This is a sample server that supports CORS.
+  var url = 'makeCorsRequest';
+
+  var xhr = createCORSRequest('GET', url);
+  if (!xhr) {
+    alert('CORS not supported');
+    return;
+  }
+
+  // Response handlers.
+  xhr.onload = function() {
+    var text = xhr.responseText;
+    //var title = getTitle(text);
+    alert('Response from CORS request to ' + url + ': ' + text);
+  };
+
+  xhr.onerror = function() {
+    alert('Woops, there was an error making the request.');
+  };
+
+  xhr.send();
+}
+
+makeCorsRequest(); */
+
+  
+//var xmlHttp = new XMLHttpRequest();
+//xhr.open( "GET", "c", false ); // false for synchronous request
+//xhr.send();
+//document.getElementById("result1").innerHTML += xhr.responseText + "<br><br>";
+
+//return xmlHttp.responseText;
+
+//var source = new EventSource("http://192.168.15.1:39151/v3/openChannel");
+var source = new EventSource("http://192.168.0.6:39151/v3/openChannel");
+source.onmessage = function(event) {
+    document.getElementById("result2").innerHTML += event.data + "<br><br>";
+};
+
+    </script>
+
+</body>
+</html>
+

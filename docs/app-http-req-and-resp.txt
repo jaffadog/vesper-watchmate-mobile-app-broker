@@ -1,0 +1,80 @@
+
+GET /prefs/getPreferences?profile.current
+    curl -v http://192.168.15.1:39151/prefs/getPreferences?profile.current
+
+
+GET /alarms/get_current_list
+    curl -v http://192.168.15.1:39151/alarms/get_current_list
+
+
+
+GET /prefs/setPreferences?profile.current=OFFSHORE
+GET /prefs/setPreferences?profile.current=COASTAL
+GET /prefs/setPreferences?profile.current=HARBOR
+GET /prefs/setPreferences?profile.current=ANCHOR
+    curl -v http://192.168.15.1:39151/prefs/setPreferences?profile.current=ANCHOR
+
+
+GET /prefs/getPreferences?profile.current
+    curl -v http://192.168.15.1:39151/prefs/getPreferences?profile.current
+
+GET /alarms/get_current_list
+    curl -v http://192.168.15.1:39151/alarms/get_current_list
+
+
+
+GET /v3/openChannel
+    curl -v -N http://192.168.0.6:39151/v3/openChannel
+    curl -v -N http://192.168.15.1:39151/v3/openChannel
+
+    GET /v3/openChannel HTTP/1.1
+    Host: 192.168.0.6:39151
+    Accept: */*
+    Accept-Language: en-us
+    Connection: keep-alive
+    Accept-Encoding: gzip, deflate
+    User-Agent: WatchMate/18853 CFNetwork/1107.1 Darwin/19.0.0
+
+GET /prefs/start_notifying
+    curl -v http://192.168.15.1:39151/prefs/start_notifying
+
+GET /v3/subscribeChannel?HeartBeat
+    curl -v http://192.168.15.1:39151/v3/subscribeChannel?HeartBeat
+    
+    GET /v3/subscribeChannel?HeartBeat HTTP/1.1
+    Host: 192.168.0.6:39151
+    Accept: application/json
+    Accept-Language: en-us
+    Connection: keep-alive
+    Accept-Encoding: gzip, deflate
+    User-Agent: WatchMate/18853 CFNetwork/1107.1 Darwin/19.0.0
+
+GET /v3/subscribeChannel?VesselPositionHistory
+    curl -v http://192.168.15.1:39151/v3/subscribeChannel?VesselPositionHistory
+
+GET /v3/subscribeChannel?AnchorWatchControl
+    curl -v http://192.168.15.1:39151/v3/subscribeChannel?AnchorWatchControl
+
+GET /v3/subscribeChannel?VesselPositionUnderway
+    curl -v http://192.168.15.1:39151/v3/subscribeChannel?VesselPositionUnderway
+
+    GET /v3/subscribeChannel?VesselPositionHistory HTTP/1.1
+    Host: 192.168.0.6:39151
+    Accept: application/json
+    Accept-Language: en-us
+    Connection: keep-alive
+    Accept-Encoding: gzip, deflate
+    User-Agent: WatchMate/18853 CFNetwork/1107.1 Darwin/19.0.0
+
+GET /v3/subscribeChannel?Sensors
+    curl -v http://192.168.15.1:39151/v3/subscribeChannel?Sensors
+
+GET /v3/subscribeChannel?AnchorWatch
+    curl -v http://192.168.15.1:39151/v3/subscribeChannel?AnchorWatch
+    404 - when anchor is up
+
+
+
+
+
+
