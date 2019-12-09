@@ -444,7 +444,7 @@ function getAlarmsXml() {
 <Name>${target.name||''}</Name>
 <COG>${formatCog(target.cog)}</COG>
 <SOG>${formatSog(target.sog)}</SOG>
-<CPA>${formatCpa(target.cpa, target.tcpa)}</CPA>
+<CPA>${formatCpa(target.cpa)}</CPA>
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
 <Range>${formatRange(target.range)}</Range>
 <BearingTrue>${target.bearing||''}</BearingTrue>
@@ -489,7 +489,7 @@ function getTargetsXml() {
 <TargetType>${target.targetType||''}</TargetType>
 <Order>${target.order||''}</Order>
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
-<CPA>${formatCpa(target.cpa, target.tcpa)}</CPA>
+<CPA>${formatCpa(target.cpa)}</CPA>
 <Bearing>${target.bearing||''}</Bearing>
 <Range>${formatRange(target.range)}</Range>
 <COG2>${formatCog(target.cog)}</COG2>
@@ -539,7 +539,7 @@ function getTargetDetails(mmsi) {
 <TargetType>${target.targetType||''}</TargetType>
 <Order>${target.order||''}</Order>
 <TCPA>${formatTcpa(target.tcpa)}</TCPA>
-<CPA>${formatCpa(target.cpa, target.tcpa)}</CPA>
+<CPA>${formatCpa(target.cpa)}</CPA>
 <Bearing>${target.bearing||''}</Bearing>
 <Range>${formatRange(target.range)}</Range>
 <COG2>${formatCog(target.cog)}</COG2>
@@ -1366,8 +1366,10 @@ function updateCpa(target) {
 	// in hours
 	var tcpa = -dot(w0,dv) / dv2;
 	
-	// if tcpa is in the past, then dont calc cpa & tcpa
-    if (!tcpa || tcpa < 0) {
+	// if tcpa is in the past, 
+	// or if tcpa is more than 3 hours in the future
+	// then dont calc cpa & tcpa
+    if (!tcpa || tcpa < 0 || tcpa > 3) {
         //console.log('cant calc tcpa: ',target.mmsi);
         target.cpa = undefined;
         target.tcpa = undefined;
@@ -1539,8 +1541,8 @@ function formatMagvar(magvar) {
     return magvar === undefined ? '' : magvar.toFixed(2);
 }
 
-function formatCpa(cpa, tcpa) {
-    return cpa === undefined || tcpa === undefined || tcpa < 0 ? '' : cpa.toFixed(2);
+function formatCpa(cpa) {
+    return cpa === undefined ? '' : cpa.toFixed(2);
 }
 
 function formatTcpa(tcpa) {
