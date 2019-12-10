@@ -9,6 +9,11 @@ const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
 
+const EventSource = require('eventsource');
+var SSE = require('express-sse');
+var sse = new SSE();
+
+
 const net = require('net');
 const geolib = require('geolib');
 const Magvar = require('magvar');
@@ -43,12 +48,15 @@ catch (err) {
 const ageOldTargets = true;
 const ageOldTargetsTTL = 20;
 
+// save changes to collision profiles and current state to disk? or just keep in memory and reset to factory state on reboot?
+// raspberry pi might be setup with read only file system (for sd card durability) which would prevent saving
+const saveCollisionProfilesEnabled = false;
+
 const nmeaServerEnabled = false;
 const nmeaServerPort = 39150;
+const nmeaServerXmitInterval = 1000;
 
 const httpPort = 39151;
-
-const xmitInterval = 1000;
 
 const myMmsi = '338327565';
 
@@ -56,6 +64,7 @@ const myMmsi = '338327565';
 // line parameters
 // where should we get ais/gps nmea data from?
 const aisHostname = 'raspberrypi0.local';
+//const aisHostname = '127.0.0.1';
 const aisPort = 39150;
 
 var gps = {};
@@ -429,6 +438,7 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 // FIXME: should this return an empty body if there are no alarms?
 // or an empty <Alarm/>
 // something other than a 200 status?
+// 404 response if there are none?
 
 function getAlarmsXml() {
     var response = 
@@ -470,6 +480,8 @@ return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <sim>stop</sim>
 </Watchmate>`
 }
+
+// FIXME 404 response if there are none?
 
 function getTargetsXml() {
     var response = 
@@ -741,20 +753,19 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     res.sendStatus(200);
 });
 
-var streamConnections = [];
+//var streamConnections = [];
 
-app.get('/v3/openChannel', function(req, res) {
-    res.sseSetup();
-    res.sseSend({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
-    streamConnections.push(res);
-});
+app.get('/v3/openChannel', sse.init);
 
 setInterval(() => {
-    console.log('streamConnections.length',streamConnections.length);
-    if (streamConnections.length > 0) {
-        console.log('sending stream');
-        streamConnections[0].sseSend({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
-    }
+    //console.log('getMaxListeners()',sse.getMaxListeners());
+    sse.send({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
+
+//    console.log('streamConnections.length',streamConnections.length);
+//    if (streamConnections.length > 0) {
+//        console.log('sending stream');
+//        streamConnections[0].sseSend({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
+//    }
 }, 1000);
 
 // unexpected request
@@ -933,7 +944,7 @@ if (nmeaServerEnabled) {
     
         
     
-    }, xmitInterval);
+    }, nmeaServerXmitInterval);
 
 }
 
@@ -1581,6 +1592,11 @@ function getCollisionProfiles(filename) {
 }
 
 function saveCollisionProfiles() {
+    
+    if (!saveCollisionProfilesEnabled) {
+        return;
+    }
+    
     try {
         var data = JSON.stringify(collisionProfiles);
         fs.writeFile('./collisionProfiles.json', data, function (err) {

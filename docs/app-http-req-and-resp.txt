@@ -24,8 +24,10 @@ GET /alarms/get_current_list
 
 
 GET /v3/openChannel
-    curl -v -N http://192.168.0.6:39151/v3/openChannel
-    curl -v -N http://192.168.15.1:39151/v3/openChannel
+    curl -v -N -H "Accept: text/event-stream" http://192.168.0.6:39151/v3/openChannel
+    curl -v -N -H "Accept: text/event-stream" http://192.168.15.1:39151/v3/openChannel
+    
+    curl -i -k -H "Accept: text/event-stream" http://playground.thisisvini.com/bohemian-rhapsody-event-stream
 
     GET /v3/openChannel HTTP/1.1
     Host: 192.168.0.6:39151
