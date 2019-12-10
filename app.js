@@ -753,27 +753,20 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     res.sendStatus(200);
 });
 
-//var streamConnections = [];
-
-app.get('/v3/openChannel', sse.init);
-
-setInterval(() => {
-    //console.log('getMaxListeners()',sse.getMaxListeners());
-    sse.send({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
-
-//    console.log('streamConnections.length',streamConnections.length);
-//    if (streamConnections.length > 0) {
-//        console.log('sending stream');
-//        streamConnections[0].sseSend({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
-//    }
-}, 1000);
+//app.get('/v3/openChannel', sse.init);
+//
+//setInterval(() => {
+//    //console.log('getMaxListeners()',sse.getMaxListeners());
+//    sse.send({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
+//}, 1000);
 
 // unexpected request
 app.get('*', function(req, res) {
     console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
     // console.log(req,'\n\n');
     // console.log(res,'\n\n');
-    res.sendStatus(200);
+    //res.sendStatus(200);
+    res.sendStatus(404);
 });
 
 app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort}!`));
