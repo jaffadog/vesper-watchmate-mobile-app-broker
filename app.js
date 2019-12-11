@@ -952,11 +952,10 @@ socket.setEncoding('latin1');
 var data = '';
 
 function connect() {
-    console.log("new socket");
+    console.log("New socket");
     
     socket.connect(aisPort, aisHostname, () => {
-	console.log("Connected")
-        // socket.write("Hello, server! Love, socket.")
+        console.log("Connected")
     });
 
     socket.on("data", chunk => {
@@ -981,19 +980,27 @@ function connect() {
     });
 
     socket.on("close", () => {
-        console.log("Connection closed")
-        reconnect()
+        console.log("Connection closed");
     });
 
     socket.on("end", () => {
-        console.log("Connection ended")
-        reconnect()
+        console.log("Connection ended");
     });
 
-    socket.on("error", () => {
-	// console.error;
-        console.log("Connection refused")
+    // app will crash if we dont catch error events here
+    socket.on("error", (err) => {
+        console.log("Connection refused",err);
     });
+}
+
+// start, monitor, and restart (as needed) connection to the ais device
+setInterval(checkAisConnection, 2000);
+
+function checkAisConnection() {
+    if (!socket || !socket.readable) {
+        socket.removeAllListeners(); 
+        connect();
+    }
 }
 
 function processAisMessage(aisMessage) {
@@ -1161,17 +1168,6 @@ function processAisMessage(aisMessage) {
         }
         
     }
-}
-
-// do initial connection attempt to ais transponder
-connect();
-
-// try reconnect to the ais transponder if the connection drops
-function reconnect() {
-    setTimeout(() => {
-        socket.removeAllListeners(); 
-        connect();
-    }, 1000);
 }
 
 function setAnchored() {

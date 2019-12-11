@@ -1,0 +1,242 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+	<Target>
+		<MMSI>235089064</MMSI>
+		<Name>INDIO BETA</Name>
+		<CallSign>2EXX4</CallSign>
+		<VesselTypeString>Sailing vessel</VesselTypeString>
+		<VesselType>36</VesselType>
+		<TargetType>2</TargetType>
+		<Order>17000</Order>
+		<TCPA>5:47:02</TCPA>
+		<CPA>0.49</CPA>
+		<Bearing>038</Bearing>
+		<Range>0.62</Range>
+		<SOG>4.8</SOG>
+		<COG>60</COG>
+		<DangerState>Danger</DangerState>
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>247041370</MMSI>
+		<Name>KENTA</Name>
+		<CallSign />
+		<VesselTypeString>Sailing vessel</VesselTypeString>
+		<VesselType>36</VesselType>
+		<TargetType>2</TargetType>
+		<Order>33535</Order>
+		<TCPA>00:21</TCPA>
+		<CPA>0.59</CPA>
+		<Bearing>030</Bearing>
+		<Range>0.59</Range>
+		<SOG>4.8</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>show</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>310570000</MMSI>
+		<Name>ERICA XII</Name>
+		<CallSign>ZCDZ4</CallSign>
+		<VesselTypeString>Sailing vessel</VesselTypeString>
+		<VesselType>36</VesselType>
+		<TargetType>1</TargetType>
+		<Order>36863</Order>
+		<TCPA />
+		<CPA />
+		<Bearing>358</Bearing>
+		<Range>0.63</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>319698000</MMSI>
+		<Name>DRUMBEAT</Name>
+		<CallSign>ZCGL9</CallSign>
+		<VesselTypeString>Sailing vessel</VesselTypeString>
+		<VesselType>36</VesselType>
+		<TargetType>1</TargetType>
+		<Order>36863</Order>
+		<TCPA />
+		<CPA />
+		<Bearing>354</Bearing>
+		<Range>0.48</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>376053000</MMSI>
+		<Name>ALUCIA</Name>
+		<CallSign>J8B4672</CallSign>
+		<VesselTypeString>Type not available</VesselTypeString>
+		<VesselType>0</VesselType>
+		<TargetType>1</TargetType>
+		<Order>36863</Order>
+		<TCPA />
+		<CPA />
+		<Bearing>360</Bearing>
+		<Range>0.63</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>512000097</MMSI>
+		<Name>M V BALDUR</Name>
+		<CallSign>ZMBD</CallSign>
+		<VesselTypeString>Cargo</VesselTypeString>
+		<VesselType>70</VesselType>
+		<TargetType>1</TargetType>
+		<Order>17407</Order>
+		<TCPA>19:49</TCPA>
+		<CPA>0.68</CPA>
+		<Bearing>034</Bearing>
+		<Range>0.68</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>show</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>512000527</MMSI>
+		<Name>AK BRIDGE NORTH PIER</Name>
+		<CallSign />
+		<VesselTypeString>Aid to navigation</VesselTypeString>
+		<VesselType>0</VesselType>
+		<TargetType>4</TargetType>
+		<Order>36856</Order>
+		<TCPA />
+		<CPA />
+		<Bearing>347</Bearing>
+		<Range>1.31</Range>
+		<SOG />
+		<DangerState />
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>512000528</MMSI>
+		<Name>AK BRIDGE SOUTH PIER</Name>
+		<CallSign />
+		<VesselTypeString>Reference point</VesselTypeString>
+		<VesselType>1</VesselType>
+		<TargetType>4</TargetType>
+		<Order>36856</Order>
+		<TCPA />
+		<CPA />
+		<Bearing>343</Bearing>
+		<Range>1.22</Range>
+		<SOG />
+		<DangerState />
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>512003347</MMSI>
+		<Name>BLUE SOVEREIGN</Name>
+		<CallSign>ZMA2273</CallSign>
+		<VesselTypeString>Sailing vessel</VesselTypeString>
+		<VesselType>36</VesselType>
+		<TargetType>2</TargetType>
+		<Order>36863</Order>
+		<TCPA />
+		<CPA />
+		<Bearing>338</Bearing>
+		<Range>0.84</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>512003812</MMSI>
+		<Name>AWANUI</Name>
+		<CallSign>ZMG2800</CallSign>
+		<VesselTypeString>Pleasure craft</VesselTypeString>
+		<VesselType>37</VesselType>
+		<TargetType>2</TargetType>
+		<Order>17023</Order>
+		<TCPA>18:57</TCPA>
+		<CPA>0.44</CPA>
+		<Bearing>036</Bearing>
+		<Range>0.44</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>show</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>512219000</MMSI>
+		<Name>AWANUIA</Name>
+		<CallSign>ZMA2137</CallSign>
+		<VesselTypeString>Tanker</VesselTypeString>
+		<VesselType>89</VesselType>
+		<TargetType>1</TargetType>
+		<Order>36863</Order>
+		<TCPA />
+		<CPA />
+		<Bearing>019</Bearing>
+		<Range>0.69</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>538070743</MMSI>
+		<Name>LADY M I I</Name>
+		<CallSign>V7UL4</CallSign>
+		<VesselTypeString>Type not available</VesselTypeString>
+		<VesselType>0</VesselType>
+		<TargetType>1</TargetType>
+		<Order>36863</Order>
+		<TCPA />
+		<CPA />
+		<Bearing>356</Bearing>
+		<Range>0.63</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>538070956</MMSI>
+		<Name>THE CLUBHOUSE</Name>
+		<CallSign>V7CF2</CallSign>
+		<VesselTypeString>Pleasure craft</VesselTypeString>
+		<VesselType>37</VesselType>
+		<TargetType>1</TargetType>
+		<Order>17079</Order>
+		<TCPA>06:03</TCPA>
+		<CPA>0.49</CPA>
+		<Bearing>031</Bearing>
+		<Range>0.49</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>show</FilteredState>
+	</Target>
+	<Target>
+		<MMSI>540011200</MMSI>
+		<Name>ESPIRITU SANTO</Name>
+		<CallSign>FQBS</CallSign>
+		<VesselTypeString>Pleasure craft</VesselTypeString>
+		<VesselType>37</VesselType>
+		<TargetType>2</TargetType>
+		<Order>33663</Order>
+		<TCPA>22:14</TCPA>
+		<CPA>0.56</CPA>
+		<Bearing>035</Bearing>
+		<Range>0.57</Range>
+		<SOG>0.0</SOG>
+		<DangerState />
+		<AlarmType />
+		<FilteredState>hide</FilteredState>
+	</Target>
+</Watchmate>
