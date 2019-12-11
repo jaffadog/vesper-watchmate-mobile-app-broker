@@ -22,6 +22,8 @@ const fs = require('fs');
 const mdns = require('multicast-dns')();
 const ip = require("ip");
 
+const { exec } = require('child_process');
+
 // FIXME: need a more elegant way to handle this. loading gpio blows up
 // on non-pi platforms
 try {
@@ -1120,6 +1122,7 @@ function processAisMessage(aisMessage) {
     }
     
     // decode NMEA message
+    // FIXME: need to get current GMT time from GPS and update RPi clock from that - 
     // FIXME: only look at GPRMC msgs to work around ggencoder bug with GGA msgs
     if (aisMessage.startsWith('$GPRMC')) {
         var decMsg = new NmeaDecode (aisMessage);
@@ -1145,6 +1148,13 @@ function processAisMessage(aisMessage) {
                         decMsg.time.substring(2,4),
                         decMsg.time.substring(4,6)
                 )).toISOString();
+            	
+            	// reset system time if variance is greater than 3 seconds
+            	var clockDrift = Math.abs(new Date() - new Date(gps.lastFix))/1000;
+            	if ( clockDrift > 3 ) {
+            	    console.log('clockDrift',clockDrift);
+            	    setSystemTime();
+            	}
             	
             	//console.log('gps.lastFix',decMsg.day,decMsg.time,new Date(decMsg.date).toISOString(),gps.lastFix);
             	
@@ -1237,6 +1247,31 @@ setInterval(savePosition, 30000);
 
 // update targets and alarms every 5 seconds
 setInterval(updateAllTargets, 5000);
+
+function setSystemTime() {
+    console.log('setting system time',gps.lastFix);
+    
+    if (gps.lastFix) {
+        // date [-u|--utc|--universal] [MMDDhhmm[[CC]YY][.ss]]
+        // sudo date --utc MMDDhhmmYYYY
+        // sudo date --utc 121119462019
+        // sudo date --utc 12112022201915
+
+        // 0123456789012345678
+        // 2019-12-11T20:13:47.597Z
+        
+        // exec  console.log
+        
+        exec('sudo date --utc ' 
+                + gps.lastFix.substring(5,7)
+                + gps.lastFix.substring(8,10)
+                + gps.lastFix.substring(11,13)
+                + gps.lastFix.substring(14,16)
+                + gps.lastFix.substring(0,4)
+                + '.' + gps.lastFix.substring(17,19)
+        );
+    }
+}
 
 function updateAllTargets() {
     addCoords(gps);
