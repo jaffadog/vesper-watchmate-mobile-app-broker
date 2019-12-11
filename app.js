@@ -56,7 +56,7 @@ const nmeaServerEnabled = false;
 const nmeaServerPort = 39150;
 const nmeaServerXmitInterval = 1000;
 
-const httpPort = 39151;
+const vesperSmartAisHttpPort = 39151;
 
 const myMmsi = '338327565';
 
@@ -769,7 +769,7 @@ app.get('*', function(req, res) {
     res.sendStatus(404);
 });
 
-app.listen(httpPort, () => console.log(`HTTP server listening on port ${httpPort}!`));
+app.listen(vesperSmartAisHttpPort,"0.0.0.0", () => console.log(`HTTP server listening on port ${vesperSmartAisHttpPort}!`));
 
 // ======================= NMEA SERVER ========================
 // listens to requests from mobile app
