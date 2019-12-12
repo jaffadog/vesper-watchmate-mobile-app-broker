@@ -969,7 +969,7 @@ function connect() {
         while (eol > -1) {
             try {
                 var aisMessage = data.substring(0, eol).toString('latin1');
-                console.log('aisMessage',aisMessage);
+                //console.log('aisMessage',aisMessage);
                 processAisMessage(aisMessage);
             }
             catch (err) {
@@ -996,18 +996,20 @@ function connect() {
 }
 
 // start, monitor, and restart (as needed) connection to the ais device
-setInterval(checkAisConnection, 2000);
+setInterval(checkAisConnection, 3000);
 
 function checkAisConnection() {
     if (!socket || !socket.readable) {
         if (socket) {
             try {
+                console.log("Connection removeAllListeners");
                 socket.removeAllListeners(); 
+                console.log("Connection destroy");
                 socket.destroy();
             }
             catch (e)
             {
-                console.log(e);
+                console.log('error cleaning up connection',e);
             }
         }
         connect();
