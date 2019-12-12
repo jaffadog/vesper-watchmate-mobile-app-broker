@@ -533,7 +533,7 @@ function getTargetDetails(mmsi) {
 <IMO>0</IMO>
 <COG>${formatCog(target.cog)}</COG>
 <HDG>${formatCog(target.hdg)}</HDG>
-<ROT>${target.rot}</ROT>
+<ROT>${formatRot(target.rot)}</ROT>
 <Altitude>-1</Altitude>
 <latitudeText>${formatLat(target.lat)}</latitudeText>
 <longitudeText>${formatLon(target.lon)}</longitudeText>
@@ -946,15 +946,13 @@ if (nmeaServerEnabled) {
 // ======================= TCP CLIENT ========================
 // gets data from AIS
 
-var socket;// = new net.Socket()
-
-
+var socket;
 var data = '';
 
 function connect() {
     socket = new net.Socket()
     socket.setEncoding('latin1');
-    console.log("New socket");
+    console.log("Connection new socket");
     
     socket.connect(aisPort, aisHostname, () => {
         console.log("Connected")
@@ -1579,6 +1577,11 @@ function evaluateAlarms(target) {
 
 function formatCog(cog) {
     return cog === undefined ? '' : ('00' + Math.round(cog)).slice(-3);
+}
+
+function formatRot(rot) {
+    // sample: 3°/min
+    return rot === undefined || rot == 0 || rot == -128 ? '' : (Math.round((rot/4.733))^2) + '°/min';
 }
 
 function formatSog(sog) {

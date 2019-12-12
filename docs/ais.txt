@@ -1,3 +1,5 @@
+https://www.navcen.uscg.gov/?pageName=AISMessagesA
+
 
 
 Message types
@@ -85,6 +87,17 @@ to_starboard
 destination
 
 =====
+
+Turn rate is encoded as follows:
+
+0 to +126 = turning right at up to 708 deg per min or higher
+0 to -126 = turning left at up to 708 deg per min or higher 
+Values between 0 and 708 deg per min coded by ROTAIS = 4.733 SQRT(ROTsensor) degrees per min
+where ROTsensor is the Rate of Turn as input by an external Rate of Turn Indicator (TI). ROTAIS is rounded to the nearest integer value.
++127 = turning right at more than 5 deg per 30 s (No TI available)
+-127 = turning left at more than 5 deg per 30 s (No TI available)
+-128 (80 hex) indicates no turn information available (default).
+ROT data should not be derived from COG information.
 
 =====
 
