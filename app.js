@@ -533,7 +533,7 @@ function getTargetDetails(mmsi) {
 <IMO>0</IMO>
 <COG>${formatCog(target.cog)}</COG>
 <HDG>${formatCog(target.hdg)}</HDG>
-<ROT></ROT>
+<ROT>${target.rot}</ROT>
 <Altitude>-1</Altitude>
 <latitudeText>${formatLat(target.lat)}</latitudeText>
 <longitudeText>${formatLon(target.lon)}</longitudeText>
@@ -946,14 +946,14 @@ if (nmeaServerEnabled) {
 // ======================= TCP CLIENT ========================
 // gets data from AIS
 
-let socket = new net.Socket()
+var socket;// = new net.Socket()
 
-// FIXME: humm... ok
-socket.setEncoding('latin1');
 
 var data = '';
 
 function connect() {
+    socket = new net.Socket()
+    socket.setEncoding('latin1');
     console.log("New socket");
     
     socket.connect(aisPort, aisHostname, () => {
@@ -969,7 +969,7 @@ function connect() {
         while (eol > -1) {
             try {
                 var aisMessage = data.substring(0, eol).toString('latin1');
-                //console.log('nmeaMessage',nmeaMessage);
+                console.log('aisMessage',aisMessage);
                 processAisMessage(aisMessage);
             }
             catch (err) {
@@ -1000,7 +1000,16 @@ setInterval(checkAisConnection, 2000);
 
 function checkAisConnection() {
     if (!socket || !socket.readable) {
-        socket.removeAllListeners(); 
+        if (socket) {
+            try {
+                socket.removeAllListeners(); 
+                socket.destroy();
+            }
+            catch (e)
+            {
+                console.log(e);
+            }
+        }
         connect();
     }
 }
@@ -1030,8 +1039,6 @@ function processAisMessage(aisMessage) {
     	target.mmsi = decMsg.mmsi;
     	target.lastSeen = new Date().toISOString();
 
-    	// console.log('target',target);
-
     	if (decMsg.shipname !== undefined) {
     	    target.name = decMsg.shipname;
     	}
@@ -1043,6 +1050,10 @@ function processAisMessage(aisMessage) {
     	
         if (decMsg.cog !== undefined) {
             target.cog = decMsg.cog;
+        }
+
+        if (decMsg.rot !== undefined) {
+            target.rot = decMsg.rot;
         }
 
         // NOTE: hdg=511 is a default value that indicates heading is not
