@@ -1581,7 +1581,7 @@ function formatCog(cog) {
 
 function formatRot(rot) {
     // sample: 3°/min
-    return rot === undefined || rot == 0 || rot == -128 ? '' : (Math.round((rot/4.733))^2) + '°/min';
+    return rot === undefined || rot == 0 || rot == -128 ? '' : Math.round(Math.pow(rot/4.733,2)) + '°/min';
 }
 
 function formatSog(sog) {
