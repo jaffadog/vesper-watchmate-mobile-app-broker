@@ -697,7 +697,8 @@ app.get('/alarms/get_current_list', (req, res) => {
         res.send( new Buffer.from(getAlarmsXml(),'latin1') );
     } else {
         // FIXME 404 or 204 ?
-        res.sendStatus(404);
+        // app blows on a 404
+        res.sendStatus(204);
     }
 });
 
