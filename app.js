@@ -682,7 +682,18 @@ app.get('/alarms/mute_alarm', (req, res) => {
 
 // GET /alarms/get_current_list
 app.get('/alarms/get_current_list', (req, res) => {
-    if (Object.keys(targets).length > 0) {
+
+    var haveAnAlarm = false;
+    
+    for (var mmsi in targets) {
+        var target = targets[mmsi];
+        if (target.dangerState) {
+            haveAnAlarm = true;
+            break;
+        }
+    }
+
+    if (haveAnAlarm) {
         res.send( new Buffer.from(getAlarmsXml(),'latin1') );
     } else {
         // FIXME 404 or 204 ?
