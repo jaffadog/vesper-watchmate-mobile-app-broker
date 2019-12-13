@@ -65,8 +65,8 @@ const myMmsi = '338327565';
 // FIXME: these are point of config... maybe use properties file.. or command
 // line parameters
 // where should we get ais/gps nmea data from?
-const aisHostname = 'raspberrypi0.local';
-//const aisHostname = '127.0.0.1';
+//const aisHostname = 'raspberrypi0.local';
+const aisHostname = '127.0.0.1';
 const aisPort = 39150;
 
 var gps = {};
