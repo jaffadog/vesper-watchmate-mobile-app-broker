@@ -682,7 +682,7 @@ app.get('/alarms/mute_alarm', (req, res) => {
 
 // GET /alarms/get_current_list
 app.get('/alarms/get_current_list', (req, res) => {
-    if (targets.count() > 0) {
+    if (Object.keys(targets).length > 0) {
         res.send( new Buffer.from(getAlarmsXml(),'latin1') );
     } else {
         // FIXME 404 or 204 ?
