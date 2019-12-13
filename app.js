@@ -683,23 +683,25 @@ app.get('/alarms/mute_alarm', (req, res) => {
 // GET /alarms/get_current_list
 app.get('/alarms/get_current_list', (req, res) => {
 
-    var haveAnAlarm = false;
-    
-    for (var mmsi in targets) {
-        var target = targets[mmsi];
-        if (target.dangerState) {
-            haveAnAlarm = true;
-            break;
-        }
-    }
+    res.send( new Buffer.from(getAlarmsXml(),'latin1') );
 
-    if (haveAnAlarm) {
-        res.send( new Buffer.from(getAlarmsXml(),'latin1') );
-    } else {
-        // FIXME 404 or 204 ?
-        // app blows on a 404
-        res.sendStatus(204);
-    }
+//    var haveAnAlarm = false;
+//    
+//    for (var mmsi in targets) {
+//        var target = targets[mmsi];
+//        if (target.dangerState) {
+//            haveAnAlarm = true;
+//            break;
+//        }
+//    }
+//
+//    if (haveAnAlarm) {
+//        res.send( new Buffer.from(getAlarmsXml(),'latin1') );
+//    } else {
+//        // FIXME 404 or 204 ?
+//        // app blows on a 404
+//        res.sendStatus(204);
+//    }
 });
 
 // GET /test/getSimFiles
