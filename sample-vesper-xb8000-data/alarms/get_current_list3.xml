@@ -1,0 +1,6 @@
+
+HTTP/1.1 200 OK
+
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='1'>
+</Watchmate>

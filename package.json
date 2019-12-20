@@ -10,7 +10,6 @@
 	"dependencies": {
 		"eventsource": "^1.0.7",
 		"express": "^4.16.4",
-		"express-sse": "^0.5.1",
 		"geolib": "^2.0.24",
 		"ggencoder": "^1.0.2",
 		"ip": "^1.1.5",

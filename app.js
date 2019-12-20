@@ -9,10 +9,8 @@ const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
 
-const EventSource = require('eventsource');
-var SSE = require('express-sse');
+var SSE = require('./sse.js')
 var sse = new SSE();
-
 
 const net = require('net');
 const geolib = require('geolib');
@@ -50,8 +48,10 @@ catch (err) {
 const ageOldTargets = true;
 const ageOldTargetsTTL = 20;
 
-// save changes to collision profiles and current state to disk? or just keep in memory and reset to factory state on reboot?
-// raspberry pi might be setup with read only file system (for sd card durability) which would prevent saving
+// save changes to collision profiles and current state to disk? or just keep in
+// memory and reset to factory state on reboot?
+// raspberry pi might be setup with read only file system (for sd card
+// durability) which would prevent saving
 const saveCollisionProfilesEnabled = false;
 
 const nmeaServerEnabled = false;
@@ -65,7 +65,7 @@ const myMmsi = '338327565';
 // FIXME: these are point of config... maybe use properties file.. or command
 // line parameters
 // where should we get ais/gps nmea data from?
-//const aisHostname = 'raspberrypi0.local';
+// const aisHostname = 'raspberrypi0.local';
 const aisHostname = '127.0.0.1';
 const aisPort = 39150;
 
@@ -590,18 +590,18 @@ app.use(function(req, res, next) {
     // res.setHeader('Content-Type', 'text/xml; charset=ISO-8859-1');
     res.setHeader('Content-Type', 'text/html; charset=ISO-8859-1');
     
-    res.sseSetup = function() {
-         res.writeHead(200, {
-             'Content-Type': 'text/event-stream',
-             'Cache-Control': 'no-cache',
-             'Connection': 'keep-alive'
-        })
-     }
-
-     res.sseSend = function(data) {
-         //res.write(data + "\n\n");
-         res.write("data:777:heartbeat" + JSON.stringify(data) + "\n\n");
-     }
+// res.sseSetup = function() {
+// res.writeHead(200, {
+// 'Content-Type': 'text/event-stream',
+// 'Cache-Control': 'no-cache',
+// 'Connection': 'keep-alive'
+// })
+// }
+//
+// res.sseSend = function(data) {
+// //res.write(data + "\n\n");
+// res.write("data:777:heartbeat" + JSON.stringify(data) + "\n\n");
+// }
 
 	next();
 });
@@ -685,23 +685,23 @@ app.get('/alarms/get_current_list', (req, res) => {
 
     res.send( new Buffer.from(getAlarmsXml(),'latin1') );
 
-//    var haveAnAlarm = false;
+// var haveAnAlarm = false;
 //    
-//    for (var mmsi in targets) {
-//        var target = targets[mmsi];
-//        if (target.dangerState) {
-//            haveAnAlarm = true;
-//            break;
-//        }
-//    }
+// for (var mmsi in targets) {
+// var target = targets[mmsi];
+// if (target.dangerState) {
+// haveAnAlarm = true;
+// break;
+// }
+// }
 //
-//    if (haveAnAlarm) {
-//        res.send( new Buffer.from(getAlarmsXml(),'latin1') );
-//    } else {
-//        // FIXME 404 or 204 ?
-//        // app blows on a 404
-//        res.sendStatus(204);
-//    }
+// if (haveAnAlarm) {
+// res.send( new Buffer.from(getAlarmsXml(),'latin1') );
+// } else {
+// // FIXME 404 or 204 ?
+// // app blows on a 404
+// res.sendStatus(204);
+// }
 });
 
 // GET /test/getSimFiles
@@ -774,19 +774,41 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     res.sendStatus(200);
 });
 
-//app.get('/v3/openChannel', sse.init);
-//
-//setInterval(() => {
-//    //console.log('getMaxListeners()',sse.getMaxListeners());
-//    sse.send({deviceTimeMillis:(new Date()).getTime(),simulation:'no'});
-//}, 1000);
+app.get('/v3/openChannel', sse.init);
+
+setInterval(() => {
+    // console.log('getMaxListeners()',sse.getMaxListeners());
+    // 24:HeartBeat{"time":1576639319000}
+    // {"time":1576639319000}       is 22 chars long. plus \n\n gets us to 24.
+
+    // 24:HeartBeat{"time":1576808013923}
+    sse.send("24:HeartBeat{\"time\":" + new Date().getTime() + "}\n\n");
+}, 15000);
+
+setInterval(() => {
+    // 75:VesselPositionUnderway{"a":407106833,"o":-740460408,"cog":0,"sog":0.0,"var":-13,"t":1576639404}
+    // sse.send("75:VesselPositionUnderway{\"a\":407106833,\"o\":-740460408,\"cog\":0,\"sog\":0.0,\"var\":-13,\"t\":1576639404}\n\n");
+
+    var vesselPositionUnderway = {
+        "a"     :   gps.lat * 1e7, 
+        "o"     :   gps.lon * 1e7, 
+        "cog"   :   gps.cog, 
+        "sog"   :   gps.sog, 
+        "var"   :   gps.magvar, 
+        "t"     :   gps.lastFix ? gps.lastFix.getTime() / 1000 : 0
+    };
+    
+    sse.send("75:VesselPositionUnderway" + JSON.stringify(vesselPositionUnderway) + "\n\n");
+}, 1000);
+
+
 
 // unexpected request
 app.get('*', function(req, res) {
     console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
     // console.log(req,'\n\n');
     // console.log(res,'\n\n');
-    //res.sendStatus(200);
+    // res.sendStatus(200);
     res.sendStatus(404);
 });
 
@@ -878,15 +900,16 @@ if (nmeaServerEnabled) {
         var message = '';
         
         /*
-    	 * var data =
-    	 * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-    	 * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-    	 * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-    	 * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-    	 * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-    	 * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-    	 * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`; socket.write(data);
-    	 */
+         * var data =
+         * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+         * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+         * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+         * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+         * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+         * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+         * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
+         * socket.write(data);
+         */
     
         if (gps.lat === undefined 
                 || gps.lon === undefined
@@ -978,7 +1001,7 @@ function connect() {
     });
 
     socket.on("data", chunk => {
-        //console.log("Received: " + chunk);
+        // console.log("Received: " + chunk);
         data += chunk;
         
         var eol = data.indexOf('\n');
@@ -986,7 +1009,7 @@ function connect() {
         while (eol > -1) {
             try {
                 var aisMessage = data.substring(0, eol).toString('latin1');
-                //console.log('aisMessage',aisMessage);
+                // console.log('aisMessage',aisMessage);
                 processAisMessage(aisMessage);
             }
             catch (err) {
@@ -1134,15 +1157,15 @@ function processAisMessage(aisMessage) {
         }
         
         // target.targetType = 1;
-        // 1 = ship - pointy box        class A
-        // 2 = triangle                 class B
-        // 3 = triangle                 ?
-        // 4 = diamond                  AToN
-        // 5 = triangle                 ?
-        // 6 = circle/cross sart        SART
-        // 7 = mob                      MOB
-        // 8 = epirb                    EPIRB
-        // 993 = aton                   AToN
+        // 1 = ship - pointy box class A
+        // 2 = triangle class B
+        // 3 = triangle ?
+        // 4 = diamond AToN
+        // 5 = triangle ?
+        // 6 = circle/cross sart SART
+        // 7 = mob MOB
+        // 8 = epirb EPIRB
+        // 993 = aton AToN
 
     	targets[decMsg.mmsi] = target;
 
@@ -1152,11 +1175,12 @@ function processAisMessage(aisMessage) {
     }
     
     // decode NMEA message
-    // FIXME: need to get current GMT time from GPS and update RPi clock from that - 
+    // FIXME: need to get current GMT time from GPS and update RPi clock from
+    // that -
     // FIXME: only look at GPRMC msgs to work around ggencoder bug with GGA msgs
     if (aisMessage.startsWith('$GPRMC')) {
         var decMsg = new NmeaDecode (aisMessage);
-        //console.log ('%j', decMsg);
+        // console.log ('%j', decMsg);
         
 	    // FIXME: add GPS accuracy and satellite data... meh
 		
@@ -1166,9 +1190,10 @@ function processAisMessage(aisMessage) {
             	gps.lon = decMsg.lon;
             	gps.magvar = Magvar.Get(gps.lat, gps.lon);
             	
-            	// FIXME: working around ggdecoder bug that returns incorrect date
-            	// 194431.00   hhmmss
-            	// 031219      ddmmyy
+            	// FIXME: working around ggdecoder bug that returns incorrect
+                // date
+            	// 194431.00 hhmmss
+            	// 031219 ddmmyy
             	
             	gps.lastFix = new Date(Date.UTC(
                         '20' + decMsg.day.substring(4,6),
@@ -1186,11 +1211,12 @@ function processAisMessage(aisMessage) {
             	    setSystemTime();
             	}
             	
-            	//console.log('gps.lastFix',decMsg.day,decMsg.time,new Date(decMsg.date).toISOString(),gps.lastFix);
+            	// console.log('gps.lastFix',decMsg.day,decMsg.time,new
+                // Date(decMsg.date).toISOString(),gps.lastFix);
             	
-                //gps.lastFix = decMsg.date.toISOString();
+                // gps.lastFix = decMsg.date.toISOString();
                 // decMsg.time is hhmmss utc... would need to be processed
-                //gps.lastFix = new Date(decMsg.time).toISOString();
+                // gps.lastFix = new Date(decMsg.time).toISOString();
             }
 	
             if (decMsg.cog !== undefined) {
@@ -1199,12 +1225,12 @@ function processAisMessage(aisMessage) {
 
             if (decMsg.sog !== undefined) {
                 gps.sog = decMsg.sog;
-                //gps.sog = parseFloat(decMsg.nmea[7])
+                // gps.sog = parseFloat(decMsg.nmea[7])
                 // decMsg.sog; this is actually m/s with 1 decimal place... not
                 // what we want. so we grab the raw nmea value above
             }
 
-            //console.log('gps',gps);
+            // console.log('gps',gps);
         }
         
     }
@@ -1290,7 +1316,7 @@ function setSystemTime() {
         // 0123456789012345678
         // 2019-12-11T20:13:47.597Z
         
-        // exec  console.log
+        // exec console.log
         
         exec('sudo date --utc ' 
                 + gps.lastFix.substring(5,7)
@@ -1358,14 +1384,16 @@ function savePosition() {
 	// in nm
 	var dist = geolib.getPathLength(recentPositions) / 1582;
 	var avgSpeed = dist/(recentPositions.length*30/3600);
-	//console.log('distance travelled over last 5 minutes:',dist,recentPositions);
+	// console.log('distance travelled over last 5
+    // minutes:',dist,recentPositions);
 	
-	// if we are underway, and average speed is less than 0.25 knots, then consider us anchored
+	// if we are underway, and average speed is less than 0.25 knots, then
+    // consider us anchored
 	if (anchorWatch.setAnchor == 0 && avgSpeed < 0.25) {
         setAnchored();
 	} 
 	
-	// if we are anchored, and more than 500 meters from the anchor, 
+	// if we are anchored, and more than 500 meters from the anchor,
 	// then consider us underway
 	if (anchorWatch.setAnchor == 1 && anchorWatch.distanceToAnchor > 500) {
         setUnderway();
@@ -1415,7 +1443,7 @@ function updateCpa(target) {
 	// the tracks are almost parallel
 	// or there is almost no relative movement
 	if (dv2 < 0.00000001) {
-        //console.log('cant calc tcpa: ',target.mmsi);
+        // console.log('cant calc tcpa: ',target.mmsi);
         target.cpa = undefined;
         target.tcpa = undefined;
         return;
@@ -1431,11 +1459,11 @@ function updateCpa(target) {
 	// in hours
 	var tcpa = -dot(w0,dv) / dv2;
 	
-	// if tcpa is in the past, 
+	// if tcpa is in the past,
 	// or if tcpa is more than 3 hours in the future
 	// then dont calc cpa & tcpa
     if (!tcpa || tcpa < 0 || tcpa > 3) {
-        //console.log('cant calc tcpa: ',target.mmsi);
+        // console.log('cant calc tcpa: ',target.mmsi);
         target.cpa = undefined;
         target.tcpa = undefined;
         return;

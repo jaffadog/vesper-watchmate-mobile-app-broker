@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='1'>
+	<Alarm MMSI='366715730' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>0.05</Range>
+		<BearingTrue>344</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367175640' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>0.08</Range>
+		<BearingTrue>111</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+	<Alarm MMSI='367420280' state='danger' type='guard'>
+		<Name></Name>
+		<COG></COG>
+		<SOG></SOG>
+		<CPA></CPA>
+		<TCPA></TCPA>
+		<Range>0.03</Range>
+		<BearingTrue>046</BearingTrue>
+		<TargetType></TargetType>
+	</Alarm>
+</Watchmate>

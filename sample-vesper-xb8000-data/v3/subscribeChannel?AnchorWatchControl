@@ -1,0 +1,30 @@
+$ curl -v http://192.168.15.1:39151/v3/subscribeChannel?AnchorWatchControl
+* STATE: INIT => CONNECT handle 0x600082ef8; line 1491 (connection #-5000)
+* Added connection 0. The cache now contains 1 members
+*   Trying 192.168.15.1:39151...
+* TCP_NODELAY set
+* STATE: CONNECT => WAITCONNECT handle 0x600082ef8; line 1547 (connection #0)
+* Connected to 192.168.15.1 (192.168.15.1) port 39151 (#0)
+* STATE: WAITCONNECT => SENDPROTOCONNECT handle 0x600082ef8; line 1667 (connection #0)
+* Marked for [keep alive]: HTTP default
+* STATE: SENDPROTOCONNECT => DO handle 0x600082ef8; line 1685 (connection #0)
+> GET /v3/subscribeChannel?AnchorWatchControl HTTP/1.1
+> Host: 192.168.15.1:39151
+> User-Agent: curl/7.66.0
+> Accept: */*
+>
+* STATE: DO => DO_DONE handle 0x600082ef8; line 1756 (connection #0)
+* STATE: DO_DONE => PERFORM handle 0x600082ef8; line 1877 (connection #0)
+* Mark bundle as not supporting multiuse
+* HTTP 1.1 or later with persistent connection
+< HTTP/1.1 200 OK
+< Content-Length: 0
+< Date: Thu, 01 Jan 1970 00:00:00
+< Content-Type: application/json
+< Access-Control-Allow-Origin: *
+<
+* STATE: PERFORM => DONE handle 0x600082ef8; line 2067 (connection #0)
+* multi_done
+* Connection #0 to host 192.168.15.1 left intact
+* Expire cleared (transfer 0x600082ef8)
+

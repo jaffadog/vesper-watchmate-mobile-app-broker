@@ -1,0 +1,11 @@
+HTTP/1.1 200 OK
+
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+	<Prefs>
+		<PrefsRequested>
+			{1,{"profile.current",""}}
+		</PrefsRequested>
+		<Pref prefname='profile.current'>HARBOR</Pref>
+	</Prefs>
+</Watchmate>

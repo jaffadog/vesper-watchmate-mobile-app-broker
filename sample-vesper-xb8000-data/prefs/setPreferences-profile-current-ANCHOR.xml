@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<Watchmate version='1.0' priority='0'>
+	<Prefs>
+		<PrefsRequested>
+			{1,{"profile.current","ANCHOR"}}
+		</PrefsRequested>
+		<Pref prefname='profile.current'>ANCHOR</Pref>
+	</Prefs>
+</Watchmate>
