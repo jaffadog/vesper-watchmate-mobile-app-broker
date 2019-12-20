@@ -795,7 +795,7 @@ setInterval(() => {
         "cog"   :   gps.cog, 
         "sog"   :   gps.sog, 
         "var"   :   gps.magvar, 
-        "t"     :   gps.lastFix ? new Date(gps.lastFix)).getTime() / 1000 : 0
+        "t"     :   gps.lastFix ? new Date(gps.lastFix).getTime() / 1000 : 0
     };
     
     sse.send("75:VesselPositionUnderway" + JSON.stringify(vesselPositionUnderway) + "\n\n");
