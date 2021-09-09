@@ -1,4 +1,4 @@
-"use strict";
+ "use strict";
 
 const AisEncode  = require ("ggencoder").AisEncode;
 const AisDecode  = require ("ggencoder").AisDecode;
@@ -24,12 +24,15 @@ const { exec } = require('child_process');
 
 // FIXME: need a more elegant way to handle this. loading gpio blows up
 // on non-pi platforms
+var Gpio = undefined;
+var buzzer = undefined;
+var button = undefined;
 try {
-    const Gpio = require('onoff').Gpio;
+    Gpio = require('onoff').Gpio;
     
-    const led = new Gpio(17, 'out');
-    const button = new Gpio(4, 'in', 'rising', {debounceTimeout: 10});
-    
+    buzzer = new Gpio(17, 'out');
+    button = new Gpio(4, 'in', 'rising', {debounceTimeout: 10});
+
     button.watch((err, value) => {
         console.log('alarm off');
         if (err) {
@@ -43,6 +46,11 @@ catch (err) {
     console.log(err);
 }
 
+const autoAnchorProfile = true;
+
+const updateClock = true;
+const maxClockDriftSecs = 60;
+
 // how long to keep old targets that we have not seen in a while
 // in minutes
 const ageOldTargets = true;
@@ -54,32 +62,73 @@ const ageOldTargetsTTL = 20;
 // durability) which would prevent saving
 const saveCollisionProfilesEnabled = false;
 
-const nmeaServerEnabled = false;
+const nmeaServerEnabled = true;
 const nmeaServerPort = 39150;
-const nmeaServerXmitInterval = 1000;
+const nmeaServerXmitInterval = 5000;
 
 const vesperSmartAisHttpPort = 39151;
 
-const myMmsi = '338327565';
+const myMmsi = '368204530';
 
 // FIXME: these are point of config... maybe use properties file.. or command
 // line parameters
 // where should we get ais/gps nmea data from?
 // const aisHostname = 'raspberrypi0.local';
-const aisHostname = '127.0.0.1';
-const aisPort = 39150;
+const aisHostname = '10.10.100.254';
+const aisPort = 8899;
 
 var gps = {};
 var targets = {};
 var aisSession = {};
+/*
 var anchorWatch = {
         setAnchor: 0,
         alarmRadius: 30,
         alarmsEnabled: 0,
         alarmTriggered: 0,
 };
+*/
+var anchorWatchControl = {
+	setAnchor:0,
+    alarmRadius: 30,
+    alarmsEnabled: 0,
+	anchorLatitude:0,
+	anchorLongitude:0,
+	anchorCorrectedLat:0,
+	anchorCorrectedLong:0,
+	usingCorrected:0,
+	distanceToAnchor:0,
+	bearingToAnchor:0,
+    alarmTriggered: 0,
+	anchorPosition:{
+		a:0,
+		o:0,
+		t:0
+	}
+};
+
+/*
+<AnchorWatch>
+	<setAnchor>1</setAnchor>
+	<alarmRadius>30</alarmRadius>
+	<alarmsEnabled>1</alarmsEnabled>
+	<anchorLatitude>399510671</anchorLatitude>
+	<anchorLongitude>-751394869</anchorLongitude>
+	<anchorCorrectedLat></anchorCorrectedLat>
+	<anchorCorrectedLong></anchorCorrectedLong>
+	<usingCorrected>0</usingCorrected>
+	<distanceToAnchor>0</distanceToAnchor>
+	<bearingToAnchor>97</bearingToAnchor>
+	<alarmTriggered>0</alarmTriggered>
+</AnchorWatch>
+*/
+
 var alarm;
 var positions = [];
+// save position every 2 seconds when underway. this changes to every 30 seconds when anchored.
+var savePositionIntervalWhenUnderway = 2000;
+var savePositionIntervalWhenAnchored = 30000;
+var savePositionInterval = savePositionIntervalWhenUnderway;
 
 // setup auto-discovery
 mdns.on('query', function(query) {
@@ -337,7 +386,6 @@ function getGpsModelAdvancedXml() {
 </Watchmate>`
 }
 
-
 function getTxStatusModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
@@ -394,17 +442,17 @@ function getAnchorWatchModelXml() {
 return `<?xml version='1.0' encoding='ISO-8859-1' ?>
 <Watchmate version='1.0' priority='0'>
 <AnchorWatch>
-<setAnchor>${anchorWatch.setAnchor}</setAnchor>
-<alarmRadius>${anchorWatch.alarmRadius}</alarmRadius>
-<alarmsEnabled>${anchorWatch.alarmsEnabled}</alarmsEnabled>
-<anchorLatitude>${Math.round(anchorWatch.lat * 1e7)||''}</anchorLatitude>
-<anchorLongitude>${Math.round(anchorWatch.lon * 1e7)||''}</anchorLongitude>
+<setAnchor>${anchorWatchControl.setAnchor}</setAnchor>
+<alarmRadius>${anchorWatchControl.alarmRadius}</alarmRadius>
+<alarmsEnabled>${anchorWatchControl.alarmsEnabled}</alarmsEnabled>
+<anchorLatitude>${anchorWatchControl.anchorPosition.a}</anchorLatitude>
+<anchorLongitude>${anchorWatchControl.anchorPosition.o}</anchorLongitude>
 <anchorCorrectedLat></anchorCorrectedLat>
 <anchorCorrectedLong></anchorCorrectedLong>
 <usingCorrected>0</usingCorrected>
-<distanceToAnchor>${anchorWatch.distanceToAnchor||''}</distanceToAnchor>
-<bearingToAnchor>${anchorWatch.bearingToAnchor||''}</bearingToAnchor>
-<alarmTriggered>${anchorWatch.alarmTriggered}</alarmTriggered>
+<distanceToAnchor>${anchorWatchControl.distanceToAnchor||''}</distanceToAnchor>
+<bearingToAnchor>${anchorWatchControl.bearingToAnchor||''}</bearingToAnchor>
+<alarmTriggered>${anchorWatchControl.alarmTriggered}</alarmTriggered>
 </AnchorWatch>
 </Watchmate>`;
 }
@@ -530,7 +578,7 @@ function getTargetDetails(mmsi) {
     if (target !== undefined) {
 	response += 
 `<Target>
-<IMO>0</IMO>
+<IMO>${target.imo||''}</IMO>
 <COG>${formatCog(target.cog)}</COG>
 <HDG>${formatCog(target.hdg)}</HDG>
 <ROT>${formatRot(target.rot)}</ROT>
@@ -539,10 +587,10 @@ function getTargetDetails(mmsi) {
 <longitudeText>${formatLon(target.lon)}</longitudeText>
 <OffPosition>0</OffPosition>
 <Virtual>0</Virtual>
-<Dimensions>---</Dimensions>
-<Draft>---</Draft>
+<Dimensions>${target.length||''}m x ${target.width||''}m</Dimensions>
+<Draft>${target.draught||''}m</Draft>
 <ClassType>${target.classType||''}</ClassType>
-<Destination></Destination>
+<Destination>${target.destination||''}</Destination>
 <ETAText></ETAText>
 <NavStatus>${target.navstatus||''}</NavStatus>
 <MMSI>${mmsi||''}</MMSI>
@@ -572,7 +620,6 @@ function getTargetDetails(mmsi) {
 function getCollisionProfilesJson() {
   return JSON.stringify(collisionProfiles,null,2);
 }
-
 
 // ======================= HTTP SERVER ========================
 // listens to requests from mobile app
@@ -628,7 +675,8 @@ app.get('/datamodel/getModel', (req, res) => {
     } 
     
     // GET /datamodel/getModel?GPSModel.,Advanced
-    else if (req.query["GPSModel.,Advanced"]==='') {
+	// GET /datamodel/getModel?GPSModel.Advanced
+    else if (req.query["GPSModel.,Advanced"]==='' || req.query["GPSModel.Advanced"]==='') {
     	res.send( new Buffer.from(getGpsModelAdvancedXml(),'latin1') );
     } 
     
@@ -739,6 +787,60 @@ app.get('/prefs/start_notifying', (req, res) => {
     res.send( new Buffer.from('Hello','latin1') );
 });
 
+// PUT /v3/anchorwatch/AnchorWatchControl
+// { '{"setAnchor":true,"alarmsEnabled":true,"anchorPosition":{"a":413515813,"o":-723778936,"t":1581064687}}': '' }
+
+/*
+headers:
+Feb 11 00:52:52 raspberrypi0 npm[1174]:    { 'content-type': 'application/x-www-form-urlencoded',
+
+Feb 11 00:52:52 raspberrypi0 npm[1174]:   body:
+Feb 11 00:52:52 raspberrypi0 npm[1174]:    { '{"setAnchor":true,"alarmsEnabled":true,"anchorPosition":{"a":416660266,"o":-712864514,"t":1581382370}}': '' },
+
+*/
+
+app.put('/v3/anchorwatch/AnchorWatchControl', (req, res) => {
+    console.log(req.body);
+    //console.log('req',req);
+    //console.log('res',res);
+    // the body is already parsed to json by express
+    //anchorWatchControl = req.body;
+    var data = JSON.parse(Object.keys(req.body)[0])
+    console.log('data=',data);
+
+	Object.assign(anchorWatchControl,data);
+	console.log('anchorWatchControl=',anchorWatchControl);
+		
+	/*
+	anchorWatchControl.setAnchor = data.setAnchor;
+	anchorWatchControl.alarmsEnabled = data.alarmsEnabled;
+	anchorWatchControl.anchorPosition = data.anchorPosition;
+	*/
+	
+	anchorWatchControl.anchorLatitude = anchorWatchControl.anchorPosition.a;
+	anchorWatchControl.anchorLongitude = anchorWatchControl.anchorPosition.o;
+	
+	console.log('anchorWatchControl',anchorWatchControl);
+	
+	/*
+	var anchorWatchControl = {
+        "anchorPosition"    :  anchorWatch.setAnchor == 0 ? {} : {
+            "a"             :   Math.round(anchorWatch.lat * 1e7), 
+            "o"             :   Math.round(anchorWatch.lon * 1e7), 
+            "t"             :   anchorWatch.time,
+            "hasBowOffset"  : false,
+            "da"            :   0,
+            "do"            :   0
+        }, 
+        "setAnchor"         :   (anchorWatch.setAnchor == 1), 
+        "alarmRadius"       :   anchorWatch.alarmRadius, 
+        "alarmsEnabled"     :   (anchorWatch.alarmsEnabled == 1)
+    };
+	*/
+	
+    res.sendStatus(204);
+});
+
 // FIXME: add
 // drop anchor / turn anchor watch on:
 // GET /datamodel/propertyEdited?AnchorWatch.setAnchor=1
@@ -762,13 +864,13 @@ app.get('/datamodel/propertyEdited', (req, res) => {
     }
 
     if (req.query["AnchorWatch.alarmsEnabled"]) {
-        console.log('setting anchorWatch.alarmsEnabled',req.query["AnchorWatch.alarmsEnabled"]);
-        anchorWatch.alarmsEnabled = req.query["AnchorWatch.alarmsEnabled"];
+        console.log('setting anchorWatchControl.alarmsEnabled',req.query["AnchorWatch.alarmsEnabled"]);
+        anchorWatchControl.alarmsEnabled = req.query["AnchorWatch.alarmsEnabled"];
     }
     
     if (req.query["AnchorWatch.alarmRadius"]) {
-        console.log('setting anchorWatch.alarmRadius',req.query["AnchorWatch.alarmRadius"]);
-        anchorWatch.alarmRadius = req.query["AnchorWatch.alarmRadius"];
+        console.log('setting anchorWatchControl.alarmRadius',req.query["AnchorWatch.alarmRadius"]);
+        anchorWatchControl.alarmRadius = req.query["AnchorWatch.alarmRadius"];
     }
 
     res.sendStatus(200);
@@ -776,6 +878,44 @@ app.get('/datamodel/propertyEdited', (req, res) => {
 
 app.get('/v3/openChannel', sse.init);
 
+// GET /v3/subscribeChannel?<anything>
+app.get('/v3/subscribeChannel', (req, res) => {
+    res.sendStatus(200);
+});
+
+// unexpected get request
+app.get('*', function(req, res) {
+    console.log(`*** unexpected get request ${req.method} ${req.originalUrl}`);
+    // console.log(req,'\n\n');
+    // console.log(res,'\n\n');
+    // res.sendStatus(200);
+    res.sendStatus(404);
+});
+
+// unexpected put request
+app.put('*', function(req, res) {
+    console.log(`*** unexpected put request ${req.method} ${req.originalUrl}`);
+    console.log(req.headers);
+    console.log(req.params);
+    console.log(req.body);
+    // console.log(req,'\n\n');
+    // console.log(res,'\n\n');
+    // res.sendStatus(200);
+    res.sendStatus(404);
+});
+
+// unexpected post request
+app.post('*', function(req, res) {
+    console.log(`*** unexpected post request ${req.method} ${req.originalUrl}`);
+    // console.log(req,'\n\n');
+    // console.log(res,'\n\n');
+    // res.sendStatus(200);
+    res.sendStatus(404);
+});
+
+app.listen(vesperSmartAisHttpPort,"0.0.0.0", () => console.log(`HTTP server listening on port ${vesperSmartAisHttpPort}!`));
+
+// send heartbeat
 setInterval(() => {
     // console.log('getMaxListeners()',sse.getMaxListeners());
     // 24:HeartBeat{"time":1576639319000}
@@ -785,34 +925,79 @@ setInterval(() => {
     sse.send("24:HeartBeat{\"time\":" + new Date().getTime() + "}\n\n");
 }, 15000);
 
+// send VesselPositionUnderway
 setInterval(() => {
     // 75:VesselPositionUnderway{"a":407106833,"o":-740460408,"cog":0,"sog":0.0,"var":-13,"t":1576639404}
+    // 80:VesselPositionUnderway{"a":380704720,"o":-785886085,"cog":220.28,"sog":0,"var":-9.77,"t":1576873731}
     // sse.send("75:VesselPositionUnderway{\"a\":407106833,\"o\":-740460408,\"cog\":0,\"sog\":0.0,\"var\":-13,\"t\":1576639404}\n\n");
 
     var vesselPositionUnderway = {
-        "a"     :   gps.lat * 1e7, 
-        "o"     :   gps.lon * 1e7, 
+        "a"     :   Math.round(gps.lat * 1e7), 
+        "o"     :   Math.round(gps.lon * 1e7), 
         "cog"   :   gps.cog, 
         "sog"   :   gps.sog, 
         "var"   :   gps.magvar, 
-        "t"     :   gps.lastFix ? new Date(gps.lastFix).getTime() / 1000 : 0
+        "t"     :   gps.time
     };
     
-    sse.send("75:VesselPositionUnderway" + JSON.stringify(vesselPositionUnderway) + "\n\n");
+    sendSseMsg("VesselPositionUnderway", vesselPositionUnderway);
 }, 1000);
 
+// send AnchorWatchControl
+setInterval(() => {
 
+ // 80:AnchorWatchControl{"anchorPosition":{},"setAnchor":false,"alarmRadius":22,"alarmsEnabled":false}
+    /*
+    var anchorWatchControl = {
+        "anchorPosition"    :  anchorWatch.setAnchor == 0 ? {} : {
+            "a"             :   Math.round(anchorWatch.lat * 1e7), 
+            "o"             :   Math.round(anchorWatch.lon * 1e7), 
+            "t"             :   anchorWatch.time,
+            "hasBowOffset"  : false,
+            "da"            :   0,
+            "do"            :   0
+        }, 
+        "setAnchor"         :   (anchorWatch.setAnchor == 1), 
+        "alarmRadius"       :   anchorWatch.alarmRadius, 
+        "alarmsEnabled"     :   (anchorWatch.alarmsEnabled == 1)
+    };
+    */
 
-// unexpected request
-app.get('*', function(req, res) {
-    console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
-    // console.log(req,'\n\n');
-    // console.log(res,'\n\n');
-    // res.sendStatus(200);
-    res.sendStatus(404);
-});
+    sendSseMsg("AnchorWatchControl", anchorWatchControl);
+}, 1000);
 
-app.listen(vesperSmartAisHttpPort,"0.0.0.0", () => console.log(`HTTP server listening on port ${vesperSmartAisHttpPort}!`));
+// send AnchorWatch
+setInterval(() => {
+    
+// 52:AnchorWatch{"outOfBounds":false,"anchorPreviousPositions":[]}
+
+    var anchorWatchJson = {
+        "outOfBounds"               :   (anchorWatchControl.alarmTriggered == 1), 
+        "anchorPreviousPositions"   :   {}
+    };
+        
+    sendSseMsg("AnchorWatch", anchorWatchJson);
+}, 1000);
+
+// send VesselPositionHistory
+setInterval(() => {
+        sendSseMsg("VesselPositionHistory", positions);
+}, 1000);
+
+// save position every 30 seconds
+//setInterval(savePosition, 30000);
+savePosition();
+
+// update targets and alarms every 5 seconds
+setInterval(updateAllTargets, 5000);
+
+// update anchor watch every 5 seconds
+setInterval(updateAnchorWatch, 5000);
+
+function sendSseMsg(name,data) {
+    var json = JSON.stringify(data);
+    sse.send((json.length + 2) + ":" + name + json + "\n\n");
+}
 
 // ======================= NMEA SERVER ========================
 // listens to requests from mobile app
@@ -852,7 +1037,6 @@ if (nmeaServerEnabled) {
     	        console.log(`****** NMEA Server: connection ${connection.id} ERROR`);
     	        console.log(err,err.stack);
     	    });
-    	    
     	    
     	});
     
@@ -894,8 +1078,9 @@ if (nmeaServerEnabled) {
     // not actually appear to use this data though - instead relying on getting
     // everything it needs from the web interfaces.
     
+	// send ais nmea data
     setInterval(function(){
-        console.log('start tcp xmit');
+        //console.log('start tcp xmit');
         
         var message = '';
         
@@ -967,19 +1152,17 @@ if (nmeaServerEnabled) {
         
         broadcast(message);
         
-    // message =
-    // `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-    // $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-    // $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-    // $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-    // $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-    // $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-    // $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75
-    // `;
-    //    
-    // broadcast(message);
-    
-        
+	    // message =
+	    // `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
+	    // $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
+	    // $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
+	    // $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
+	    // $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
+	    // $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
+	    // $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75
+	    // `;
+	    //    
+	    // broadcast(message);
     
     }, nmeaServerXmitInterval);
 
@@ -1063,7 +1246,7 @@ function processAisMessage(aisMessage) {
     // decode and AIS message
     if (aisMessage.startsWith('!AI')) { 
         var decMsg = new AisDecode (aisMessage, aisSession);
-        // console.log ('%j', decMsg);
+        //console.log ('%j', decMsg);
 
         // ignore if not valid, no mmsi, or is my mmsi
         if (!decMsg.valid || !decMsg.mmsi || decMsg.mmsi === myMmsi) {
@@ -1130,7 +1313,28 @@ function processAisMessage(aisMessage) {
         if (decMsg.callsign !== undefined) {
             target.callsign = decMsg.callsign;
         }
+		
+
+        if (decMsg.imo !== undefined) {
+            target.imo = decMsg.imo;
+        }
         
+        if (decMsg.destination !== undefined) {
+            target.destination = decMsg.destination;
+        }
+        
+        if (decMsg.length !== undefined) {
+            target.length = decMsg.length;
+        }
+        
+        if (decMsg.width !== undefined) {
+            target.width = decMsg.width;
+        }
+        
+        if (decMsg.draught !== undefined) {
+            target.draught = decMsg.draught;
+        }
+                
         // SART
         if (decMsg.mmsi.startsWith('970')) {
             target.targetType = 6;
@@ -1194,29 +1398,28 @@ function processAisMessage(aisMessage) {
                 // date
             	// 194431.00 hhmmss
             	// 031219 ddmmyy
-            	
-            	gps.lastFix = new Date(Date.UTC(
+
+				// month starts at zero
+            	gps.time = Math.round(new Date(Date.UTC(
                         '20' + decMsg.day.substring(4,6),
                         decMsg.day.substring(2,4) - 1,
                         decMsg.day.substring(0,2),
                         decMsg.time.substring(0,2),
                         decMsg.time.substring(2,4),
                         decMsg.time.substring(4,6)
-                )).toISOString();
+                )).getTime() / 1000);
+
+				//console.log( decMsg.time,decMsg.day,decMsg.date,new Date(gps.time*1000) );
             	
-            	// reset system time if variance is greater than 3 seconds
-            	var clockDrift = Math.abs(new Date() - new Date(gps.lastFix))/1000;
-            	if ( clockDrift > 3 ) {
-            	    console.log('clockDrift',clockDrift);
-            	    setSystemTime();
+            	if (updateClock) {
+                    // reset system time if variance is greater than 3 seconds
+                    var clockDrift = Math.abs(new Date().getTime()/1000 - gps.time);
+					//console.log('*** clockDrift',clockDrift,new Date(),new Date().getTime()/1000,gps.time);
+                    if ( clockDrift > maxClockDriftSecs ) {
+                        console.log('*** updating system time - clockDrift',clockDrift);
+                        setSystemTime();
+                    }
             	}
-            	
-            	// console.log('gps.lastFix',decMsg.day,decMsg.time,new
-                // Date(decMsg.date).toISOString(),gps.lastFix);
-            	
-                // gps.lastFix = decMsg.date.toISOString();
-                // decMsg.time is hhmmss utc... would need to be processed
-                // gps.lastFix = new Date(decMsg.time).toISOString();
             }
 	
             if (decMsg.cog !== undefined) {
@@ -1224,8 +1427,8 @@ function processAisMessage(aisMessage) {
             }
 
             if (decMsg.sog !== undefined) {
-                gps.sog = decMsg.sog;
-                // gps.sog = parseFloat(decMsg.nmea[7])
+                //gps.sog = decMsg.sog;
+                gps.sog = parseFloat(decMsg.nmea[7])
                 // decMsg.sog; this is actually m/s with 1 decimal place... not
                 // what we want. so we grab the raw nmea value above
             }
@@ -1238,20 +1441,23 @@ function processAisMessage(aisMessage) {
 
 function setAnchored() {
     console.log('setting anchored');
-    anchorWatch.lat = gps.lat;
-    anchorWatch.lon = gps.lon;
-    anchorWatch.alarmsEnabled = 1;
-    anchorWatch.setAnchor = 1;
+    anchorWatchControl.anchorPosition.a = Math.round(gps.lat * 1e7);
+    anchorWatchControl.anchorPosition.o = Math.round(gps.lon * 1e7);
+    anchorWatchControl.anchorPosition.t = gps.time;
+    anchorWatchControl.alarmsEnabled = 1;
+    anchorWatchControl.setAnchor = 1;
     collisionProfiles.current = "anchor";
     saveCollisionProfiles();
+	savePositionInterval = savePositionIntervalWhenAnchored;
 }
 
 function setUnderway() {
     console.log('setting underway');
-    anchorWatch.alarmsEnabled = 0;
-    anchorWatch.setAnchor = 0;
+    anchorWatchControl.alarmsEnabled = 0;
+    anchorWatchControl.setAnchor = 0;
     collisionProfiles.current = "coastal";
     saveCollisionProfiles();
+	savePositionInterval = savePositionIntervalWhenUnderway;
 }
 
 // latitudeText: 'N 39° 57.0689',
@@ -1275,7 +1481,7 @@ function calculateRangeAndBearing(target) {
 		    || gps.lon === undefined
 		    || target.lat === undefined
 		    || target.lon === undefined) {
-		console.log('cant calc calculateRangeAndBearing: missing data',target.mmsi);
+		//console.log('cant calc calculateRangeAndBearing: missing data',target.mmsi);
 		target.range = undefined;
 		target.bearing = undefined;
 		return;
@@ -1298,16 +1504,10 @@ function calculateRangeAndBearing(target) {
 
 }
 
-// save position every 30 seconds
-setInterval(savePosition, 30000);
-
-// update targets and alarms every 5 seconds
-setInterval(updateAllTargets, 5000);
-
 function setSystemTime() {
-    console.log('setting system time',gps.lastFix);
+    console.log('setting system time',gps.time);
     
-    if (gps.lastFix) {
+    if (gps.time) {
         // date [-u|--utc|--universal] [MMDDhhmm[[CC]YY][.ss]]
         // sudo date --utc MMDDhhmmYYYY
         // sudo date --utc 121119462019
@@ -1317,14 +1517,16 @@ function setSystemTime() {
         // 2019-12-11T20:13:47.597Z
         
         // exec console.log
+
+        var now = new Date(gps.time * 1000).toISOString();
         
         exec('sudo date --utc ' 
-                + gps.lastFix.substring(5,7)
-                + gps.lastFix.substring(8,10)
-                + gps.lastFix.substring(11,13)
-                + gps.lastFix.substring(14,16)
-                + gps.lastFix.substring(0,4)
-                + '.' + gps.lastFix.substring(17,19)
+                + now.substring(5,7)
+                + now.substring(8,10)
+                + now.substring(11,13)
+                + now.substring(14,16)
+                + now.substring(0,4)
+                + '.' + now.substring(17,19)
         );
     }
 }
@@ -1350,55 +1552,69 @@ function updateAllTargets() {
     }
     
     // console.log(gps);
-    
-    updateAnchorWatch();
 }
 
 // save position
 // keep up to 2880 positions (24 hours at 30 sec cadence)
 function savePosition() {
-	if (gps.lat !== undefined) {
-		positions.unshift({
-			lat: gps.lat,
-			lon: gps.lon,
-			time: new Date().toISOString(),
-		});
-		
-		if (positions.length > 2880) {
-		    positions.length = 2880;
+	try {
+		if (gps.lat !== undefined) {
+			positions.unshift({
+	//            lat: gps.lat,
+	//            lon: gps.lon,
+	//            time: gps.time,
+	            a: Math.round(gps.lat * 1e7),
+	            o: Math.round(gps.lon * 1e7),
+	            t: gps.time
+			});
+			
+			if (positions.length > 2880) {
+			    positions.length = 2880;
+			}
+		}
+	
+		if (autoAnchorProfile) {
+			// most recent 10 positions
+	    	var recentPositions = positions.slice(0,10);
+	    	
+	    	// don't evaluate movement until we have atleast 3 sequential positions
+	    	if (recentPositions.length < 3) {
+	    	    return;
+	    	}
+	    	
+	    	recentPositions.forEach(function(position) {
+	    	    position.latitude = position.a / 1e7;
+	    	    position.longitude = position.o / 1e7;
+	    	});
+	    	
+	    	// in nm
+			//console.log('recentPositions',recentPositions);
+	    	var dist = geolib.getPathLength(recentPositions) / 1582;
+	    	var avgSpeed = dist / (recentPositions.length * savePositionInterval / 1000 / 3600);
+	    	
+	    	// if we are underway, and average speed is less than 0.25 knots, then
+	        // consider us anchored
+	    	if (anchorWatchControl.setAnchor == 0 && avgSpeed < 0.25) {
+		    	console.log('dist and avgSpeed:',dist,avgSpeed,recentPositions.length,savePositionInterval, anchorWatchControl.setAnchor);
+	            setAnchored();
+	    	} 
+	    	
+	    	// if we are anchored, and more than 100 meters from the anchor,
+	    	// then consider us underway
+	    	if (anchorWatchControl.setAnchor == 1 && anchorWatchControl.distanceToAnchor > 100) {
+		    	console.log('dist and avgSpeed:',dist,avgSpeed,recentPositions.length,savePositionInterval, anchorWatchControl.setAnchor);
+	            setUnderway();
+	    	}
 		}
 	}
-	
-	var recentPositions = positions.slice(0,10);
-	
-	// don't evaluate movement until we have atleast 3 sequential positions
-	if (recentPositions.length < 3) {
-	    return;
+	catch(err) {
+	    console.log('error in savePosition',err.message,err);
+	}
+	finally {
+		// call this function again to save position on the desired interval (which varries)
+		setTimeout(savePosition, savePositionInterval);
 	}
 	
-	recentPositions.forEach(function(position) {
-	    position.latitude = position.lat;
-	    position.longitude = position.lon;
-	});
-	
-	// in nm
-	var dist = geolib.getPathLength(recentPositions) / 1582;
-	var avgSpeed = dist/(recentPositions.length*30/3600);
-	// console.log('distance travelled over last 5
-    // minutes:',dist,recentPositions);
-	
-	// if we are underway, and average speed is less than 0.25 knots, then
-    // consider us anchored
-	if (anchorWatch.setAnchor == 0 && avgSpeed < 0.25) {
-        setAnchored();
-	} 
-	
-	// if we are anchored, and more than 500 meters from the anchor,
-	// then consider us underway
-	if (anchorWatch.setAnchor == 1 && anchorWatch.distanceToAnchor > 500) {
-        setUnderway();
-	}
-
 }
 
 function ageOutOldTargets(target) {
@@ -1419,7 +1635,7 @@ function updateCpa(target) {
     	    || target.lon === undefined
     	    || target.sog === undefined
     	    || target.cog === undefined) {
-    	console.log('cant calc cpa: missing data',target.mmsi);
+    	//console.log('cant calc cpa: missing data',target.mmsi);
         target.cpa = undefined;
         target.tcpa = undefined;
     	return;
@@ -1702,24 +1918,31 @@ function saveCollisionProfiles() {
 }
 
 function updateAnchorWatch() {
-    if (!anchorWatch.setAnchor) {
+	
+	//console.log('anchorWatchControl',anchorWatchControl,savePositionInterval);
+	
+	// if anchored, then record position every 30 secs
+	// otherwise if underway, then record position everry 2 secs
+	savePositionInterval = (anchorWatchControl.setAnchor) ? savePositionIntervalWhenAnchored : savePositionIntervalWhenUnderway;
+
+    if (!anchorWatchControl.setAnchor) {
         return;
     }
     
     // in meters
-    anchorWatch.distanceToAnchor = geolib.getDistance(
+    anchorWatchControl.distanceToAnchor = geolib.getDistance(
             {latitude: gps.lat, longitude: gps.lon},
-            {latitude: anchorWatch.lat, longitude: anchorWatch.lon}
+            {latitude: anchorWatchControl.anchorPosition.a / 1e7, longitude: anchorWatchControl.anchorPosition.o / 1e7}
         );
     
-    anchorWatch.bearingToAnchor = Math.round(geolib.getRhumbLineBearing(
+    anchorWatchControl.bearingToAnchor = Math.round(geolib.getRhumbLineBearing(
             {latitude: gps.lat, longitude: gps.lon},
-            {latitude: anchorWatch.lat, longitude: anchorWatch.lon}
+            {latitude: anchorWatchControl.anchorPosition.a / 1e7, longitude: anchorWatchControl.anchorPosition.o / 1e7}
         ));
 
-    anchorWatch.alarmTriggered = (anchorWatch.distanceToAnchor > anchorWatch.alarmRadius) ? 1 : 0;
+    anchorWatchControl.alarmTriggered = (anchorWatchControl.distanceToAnchor > anchorWatchControl.alarmRadius) ? 1 : 0;
     
-    if (anchorWatch.alarmsEnabled == 1 && anchorWatch.alarmTriggered == 1) {
+    if (anchorWatchControl.alarmsEnabled == 1 && anchorWatchControl.alarmTriggered == 1) {
     	startAlarm();
     }
 }
@@ -1730,9 +1953,9 @@ function startAlarm() {
 		// toggle led on and off every 500 ms
 		alarm = setInterval(function() {
 			try {
-				var onOff = led.readSync() ^ 1;
+				var onOff = buzzer.readSync() ^ 1;
 				console.log('alarm!',onOff);
-				led.writeSync(onOff);
+				buzzer.writeSync(onOff);
 			}
 		    catch (err) {
 		        console.log('error in startAlarm',err.message);
@@ -1745,7 +1968,7 @@ function stopAlarm() {
 	try {
 	    clearInterval(alarm);
 		alarm = undefined;
-	    led.writeSync(0);
+	    buzzer.writeSync(0);
 	}
     catch (err) {
         console.log('error in stopAlarm',err.message);
@@ -1762,16 +1985,19 @@ function muteAlarms() {
     
     // TODO: or should we just silence the anchor watch for 20 minutes? that
     // might be better
-    if (anchorWatch.alarmsEnabled == 1 && anchorWatch.alarmTriggered == 1) {
-    	anchorWatch.alarmsEnabled = 0;
+    if (anchorWatchControl.alarmsEnabled == 1 && anchorWatchControl.alarmTriggered == 1) {
+    	anchorWatchControl.alarmsEnabled = 0;
     }
     
     // stop the mayhem
     stopAlarm();
 }
 
-process.on('SIGINT', () => {
+function exit() {
     stopAlarm();
-	led.unexport();
+	buzzer.unexport();
 	button.unexport();
-});
+	process.exit();
+}
+ 
+process.on('SIGINT', exit);

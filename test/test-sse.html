@@ -8,7 +8,7 @@
 <script>
 if(typeof(EventSource) !== "undefined") {
   /* this does not work because of CORS */
-  var source = new EventSource("http://raspberrypi0.local:39151/v3/openChannel");
+  var source = new EventSource("http://10.10.100.200:39151/v3/openChannel");
   source.onmessage = function(event) {
     document.getElementById("result").innerHTML += event.data + "<br>";
   };

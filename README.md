@@ -20,6 +20,7 @@ Stuff that works at this point:
 Stuff that I am working on:
 
 - Anchor watch. Starting the anchor watch and alarming works, but we don't see the boat move with respect to the anchor in the app anchor watch page, and we don't see the breadcrumbs of previous positions. Nor are we able adjust the anchor location (presumably by dragging the icon).
+- I have this working for the Android app, but it does not work for the iOS app. There are significant differences between the Android and iOS WatchMate apps. In my testing the Android app is significantly more stable and responsive than the iOS app.
 
 Stuff that will definitely never be supported:
 
