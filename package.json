@@ -15,9 +15,11 @@
 		"ip": "^1.1.5",
 		"lethexa-motionpredict": "^0.4.1",
 		"magvar": "^1.0.0",
-		"multicast-dns": "^7.2.0",
+		"multicast-dns": "^7.2.3",
+		"node-tcp-proxy": "0.0.21",
 		"onoff": "^3.2.2",
-		"reconnect-net": "^1.1.1"
+		"reconnect-net": "^1.1.1",
+		"xml-escape": "^1.1.0"
 	},
 	"devDependencies": {},
 	"scripts": {

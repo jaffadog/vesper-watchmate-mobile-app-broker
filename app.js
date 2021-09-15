@@ -20,6 +20,10 @@ const fs = require('fs');
 const mdns = require('multicast-dns')();
 const ip = require("ip");
 
+const xmlescape = require('xml-escape');
+
+var proxy = require("node-tcp-proxy");
+
 const { exec } = require('child_process');
 
 // FIXME: need a more elegant way to handle this. loading gpio blows up
@@ -43,7 +47,7 @@ try {
     });
 }
 catch (err) {
-    console.log(err);
+    console.log('error setting up gpio',err);
 }
 
 const autoAnchorProfile = true;
@@ -62,7 +66,7 @@ const ageOldTargetsTTL = 20;
 // durability) which would prevent saving
 const saveCollisionProfilesEnabled = false;
 
-const nmeaServerEnabled = true;
+const nmeaServerEnabled = false;
 const nmeaServerPort = 39150;
 const nmeaServerXmitInterval = 5000;
 
@@ -129,6 +133,9 @@ var positions = [];
 var savePositionIntervalWhenUnderway = 2000;
 var savePositionIntervalWhenAnchored = 30000;
 var savePositionInterval = savePositionIntervalWhenUnderway;
+// 86,400 seconds per 24 hour day. 86400/2 = 43200. 86400/30 = 2880.
+// TODO
+var savePositionsDuration = 111;
 
 // setup auto-discovery
 mdns.on('query', function(query) {
@@ -501,7 +508,7 @@ function getAlarmsXml() {
         if (target.dangerState) {
             response += 
 `<Alarm MMSI='${target.mmsi}' state='${target.dangerState||''}' type='${target.alarmType||''}'>
-<Name>${target.name||''}</Name>
+<Name>${xmlescape(target.name)||''}</Name>
 <COG>${formatCog(target.cog)}</COG>
 <SOG>${formatSog(target.sog)}</SOG>
 <CPA>${formatCpa(target.cpa)}</CPA>
@@ -544,8 +551,8 @@ function getTargetsXml() {
 	response += 
 `<Target>
 <MMSI>${target.mmsi}</MMSI>
-<Name>${target.name||''}</Name>
-<CallSign>${target.callsign||''}</CallSign> 
+<Name>${xmlescape(target.name)||''}</Name>
+<CallSign>${xmlescape(target.callsign)||''}</CallSign> 
 <VesselTypeString>${target.VesselTypeString||''}</VesselTypeString>
 <VesselType>${target.VesselType||''}</VesselType>
 <TargetType>${target.targetType||''}</TargetType>
@@ -590,12 +597,12 @@ function getTargetDetails(mmsi) {
 <Dimensions>${target.length||''}m x ${target.width||''}m</Dimensions>
 <Draft>${target.draught||''}m</Draft>
 <ClassType>${target.classType||''}</ClassType>
-<Destination>${target.destination||''}</Destination>
+<Destination>${xmlescape(target.destination)||''}</Destination>
 <ETAText></ETAText>
 <NavStatus>${target.navstatus||''}</NavStatus>
 <MMSI>${mmsi||''}</MMSI>
-<Name>${target.name||''}</Name>
-<CallSign>${target.callsign||''}</CallSign> 
+<Name>${xmlescape(target.name)||''}</Name>
+<CallSign>${xmlescape(target.callsign)||''}</CallSign> 
 <VesselTypeString>${target.VesselTypeString||''}</VesselTypeString>
 <VesselType>${target.VesselType||''}</VesselType>
 <TargetType>${target.targetType||''}</TargetType>
@@ -630,7 +637,7 @@ app.set('etag',false);
 
 // log all requests
 app.use(function(req, res, next) {
-    console.info(`${req.method} ${req.originalUrl}`);
+    //console.info(`${req.method} ${req.originalUrl}`);
 
 	// express.js automatically adds utf-8 encoding to everything. this
 	// overrides that. the watchmate mobile app cannot deal with utf-8.
@@ -728,6 +735,17 @@ app.get('/alarms/mute_alarm', (req, res) => {
     res.sendStatus(200);
 });
 
+// GET /v3/control?muteAlarms
+app.get('/v3/control', (req, res) => {
+    if (req.query["muteAlarms"]) {
+		muteAlarms();
+		res.sendStatus(200);
+    } else {
+        console.log(`*** sending 404 for ${req.method} ${req.originalUrl}`);
+        res.sendStatus(404);
+	}
+});
+
 // GET /alarms/get_current_list
 app.get('/alarms/get_current_list', (req, res) => {
 
@@ -809,7 +827,7 @@ app.put('/v3/anchorwatch/AnchorWatchControl', (req, res) => {
     console.log('data=',data);
 
 	Object.assign(anchorWatchControl,data);
-	console.log('anchorWatchControl=',anchorWatchControl);
+	//console.log('anchorWatchControl=',anchorWatchControl);
 		
 	/*
 	anchorWatchControl.setAnchor = data.setAnchor;
@@ -837,6 +855,8 @@ app.put('/v3/anchorwatch/AnchorWatchControl', (req, res) => {
         "alarmsEnabled"     :   (anchorWatch.alarmsEnabled == 1)
     };
 	*/
+	
+	stopAlarm();
 	
     res.sendStatus(204);
 });
@@ -884,20 +904,20 @@ app.get('/v3/subscribeChannel', (req, res) => {
 });
 
 // unexpected get request
-app.get('*', function(req, res) {
-    console.log(`*** unexpected get request ${req.method} ${req.originalUrl}`);
-    // console.log(req,'\n\n');
-    // console.log(res,'\n\n');
-    // res.sendStatus(200);
-    res.sendStatus(404);
-});
+//app.get('*', function(req, res) {
+//    console.log(`*** unexpected get request ${req.method} ${req.originalUrl}`);
+//    // console.log(req,'\n\n');
+//    // console.log(res,'\n\n');
+//    // res.sendStatus(200);
+//    res.sendStatus(404);
+//});
 
 // unexpected put request
-app.put('*', function(req, res) {
-    console.log(`*** unexpected put request ${req.method} ${req.originalUrl}`);
-    console.log(req.headers);
-    console.log(req.params);
-    console.log(req.body);
+app.all('*', function(req, res) {
+    console.log(`*** unexpected request ${req.method} ${req.originalUrl}`);
+    console.log('headers=', req.headers);
+    console.log('params=',req.params);
+    console.log('body=',req.body);
     // console.log(req,'\n\n');
     // console.log(res,'\n\n');
     // res.sendStatus(200);
@@ -905,13 +925,13 @@ app.put('*', function(req, res) {
 });
 
 // unexpected post request
-app.post('*', function(req, res) {
-    console.log(`*** unexpected post request ${req.method} ${req.originalUrl}`);
-    // console.log(req,'\n\n');
-    // console.log(res,'\n\n');
-    // res.sendStatus(200);
-    res.sendStatus(404);
-});
+//app.post('*', function(req, res) {
+//    console.log(`*** unexpected post request ${req.method} ${req.originalUrl}`);
+//    // console.log(req,'\n\n');
+//    // console.log(res,'\n\n');
+//    // res.sendStatus(200);
+//    res.sendStatus(404);
+//});
 
 app.listen(vesperSmartAisHttpPort,"0.0.0.0", () => console.log(`HTTP server listening on port ${vesperSmartAisHttpPort}!`));
 
@@ -1002,6 +1022,9 @@ function sendSseMsg(name,data) {
 // ======================= NMEA SERVER ========================
 // listens to requests from mobile app
 
+var aisProxy = proxy.createProxy(nmeaServerPort, aisHostname, aisPort, {hostname: '0.0.0.0',quiet: true});
+
+
 if (nmeaServerEnabled) {
 
     var connectionNumber = 0;
@@ -1051,7 +1074,7 @@ if (nmeaServerEnabled) {
     	});
     }
     catch (err) {
-        console.log('error in NMEA server',err.message)
+        console.log('error in NMEA server',err)
     }
     
     function broadcast(msg) {
@@ -1061,7 +1084,7 @@ if (nmeaServerEnabled) {
             });
         }
         catch (err) {
-            console.log('error in broadcast',err.message)
+            console.log('error in broadcast',err)
         }
     }
     
@@ -1196,7 +1219,7 @@ function connect() {
                 processAisMessage(aisMessage);
             }
             catch (err) {
-                console.log('error', err.message);
+                console.log('error in connect.on.data', err, data, eol);
             }
 
             data = data.substring(eol + 1);
@@ -1230,9 +1253,9 @@ function checkAisConnection() {
                 console.log("Connection destroy");
                 socket.destroy();
             }
-            catch (e)
+            catch (err)
             {
-                console.log('error cleaning up connection',e);
+                console.log('error cleaning up connection',err);
             }
         }
         connect();
@@ -1416,7 +1439,7 @@ function processAisMessage(aisMessage) {
                     var clockDrift = Math.abs(new Date().getTime()/1000 - gps.time);
 					//console.log('*** clockDrift',clockDrift,new Date(),new Date().getTime()/1000,gps.time);
                     if ( clockDrift > maxClockDriftSecs ) {
-                        console.log('*** updating system time - clockDrift',clockDrift);
+                        console.log('*** updating system time - clockDrift',clockDrift, new Date(), decMsg);
                         setSystemTime();
                     }
             	}
@@ -1441,11 +1464,26 @@ function processAisMessage(aisMessage) {
 
 function setAnchored() {
     console.log('setting anchored');
-    anchorWatchControl.anchorPosition.a = Math.round(gps.lat * 1e7);
-    anchorWatchControl.anchorPosition.o = Math.round(gps.lon * 1e7);
-    anchorWatchControl.anchorPosition.t = gps.time;
-    anchorWatchControl.alarmsEnabled = 1;
-    anchorWatchControl.setAnchor = 1;
+
+	anchorWatchControl = {
+		setAnchor:1,
+	    alarmRadius: 30,
+	    alarmsEnabled: 1,
+	    alarmTriggered: 0,
+		anchorLatitude:Math.round(gps.lat * 1e7),
+		anchorLongitude:Math.round(gps.lon * 1e7),
+		anchorCorrectedLat:0,
+		anchorCorrectedLong:0,
+		usingCorrected:0,
+		distanceToAnchor:0,
+		bearingToAnchor:0,
+		anchorPosition:{
+			a:Math.round(gps.lat * 1e7),
+			o:Math.round(gps.lon * 1e7),
+			t:gps.time
+		}
+	};
+
     collisionProfiles.current = "anchor";
     saveCollisionProfiles();
 	savePositionInterval = savePositionIntervalWhenAnchored;
@@ -1453,8 +1491,26 @@ function setAnchored() {
 
 function setUnderway() {
     console.log('setting underway');
-    anchorWatchControl.alarmsEnabled = 0;
-    anchorWatchControl.setAnchor = 0;
+
+	anchorWatchControl = {
+		setAnchor:0,
+	    alarmRadius: 30,
+	    alarmsEnabled: 0,
+	    alarmTriggered: 0,
+		anchorLatitude:0,
+		anchorLongitude:0,
+		anchorCorrectedLat:0,
+		anchorCorrectedLong:0,
+		usingCorrected:0,
+		distanceToAnchor:0,
+		bearingToAnchor:0,
+		anchorPosition:{
+			a:0,
+			o:0,
+			t:0
+		}
+	};
+
     collisionProfiles.current = "coastal";
     saveCollisionProfiles();
 	savePositionInterval = savePositionIntervalWhenUnderway;
@@ -1507,16 +1563,45 @@ function calculateRangeAndBearing(target) {
 function setSystemTime() {
     console.log('setting system time',gps.time);
     
-    if (gps.time) {
+    if (gps.time && gps.time>0) {
         // date [-u|--utc|--universal] [MMDDhhmm[[CC]YY][.ss]]
         // sudo date --utc MMDDhhmmYYYY
         // sudo date --utc 121119462019
-        // sudo date --utc 12112022201915
 
         // 0123456789012345678
         // 2019-12-11T20:13:47.597Z
         
         // exec console.log
+
+/*
+Sep 11 16:35:20 raspberrypi0 npm[9331]: *** updating system time - clockDrift 57486069118.583 2021-09-11T15:35:20.584Z NmeaDecode {
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   nmea:
+Sep 11 16:35:20 raspberrypi0 npm[9331]:    [ '$GPRMC',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      '153 22.00',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      'A',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      '4124.9904&',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      'N',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      '07114.34552',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      'W\b5.024',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      '104.21',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      '110921',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      '13.50',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      'W',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:      'A*09\r' ],
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   valid: true,
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   cmd: 2,
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   mssi: 0,
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   time: '153 22.00',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   lat: NaN,
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   lon: 71.239092,
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   sog: 53.6,
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   cog: 110921,
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   day: '13.50',
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   alt: NaN,
+Sep 11 16:35:20 raspberrypi0 npm[9331]:   date: 1356966202000 }
+Sep 11 16:35:20 raspberrypi0 npm[9331]: setting system time -55854694598
+*/
+
 
         var now = new Date(gps.time * 1000).toISOString();
         
@@ -1532,26 +1617,31 @@ function setSystemTime() {
 }
 
 function updateAllTargets() {
-    addCoords(gps);
-	addSpeed(gps);
-    for (var mmsi in targets) {
-    	var target = targets[mmsi];
-    	var targetDeleted = false;
-
-    	if (ageOldTargets) {
-    	    targetDeleted = ageOutOldTargets(target);
-    	}
-
-    	if (!targetDeleted) {
-            calculateRangeAndBearing(target);
-            updateCpa(target);
-            evaluateAlarms(target);
-    	}
-    	
-    	// console.log(target);
-    }
-    
-    // console.log(gps);
+	try {
+	    addCoords(gps);
+		addSpeed(gps);
+	    for (var mmsi in targets) {
+	    	var target = targets[mmsi];
+	    	var targetDeleted = false;
+	
+	    	if (ageOldTargets) {
+	    	    targetDeleted = ageOutOldTargets(target);
+	    	}
+	
+	    	if (!targetDeleted) {
+	            calculateRangeAndBearing(target);
+	            updateCpa(target);
+	            evaluateAlarms(target);
+	    	}
+	    	
+	    	// console.log(target);
+	    }
+	    
+	    // console.log(gps);
+	}
+	catch(err) {
+	    console.log('error in updateAllTargets',err.message,err);
+	}
 }
 
 // save position
@@ -1608,7 +1698,7 @@ function savePosition() {
 		}
 	}
 	catch(err) {
-	    console.log('error in savePosition',err.message,err);
+	    console.log('error in savePosition',err.message,err,gps);
 	}
 	finally {
 		// call this function again to save position on the desired interval (which varries)
@@ -1779,6 +1869,7 @@ function evaluateAlarms(target) {
         target.filteredState = 'show';
         target.order = 8190;
         if (!target.alarmMuted) {
+			console.log('collision alarm triggered for:',target);
         	startAlarm();
         }
     }
@@ -1889,7 +1980,7 @@ function getCollisionProfiles(filename) {
     }
     catch (err) {
         console.log('There has been an error parsing your JSON.')
-        console.log(err.message);
+        console.log(err);
     }
     return myObj;
 }
@@ -1905,7 +1996,7 @@ function saveCollisionProfiles() {
         fs.writeFile('./collisionProfiles.json', data, function (err) {
             if (err) {
                 console.log('There has been an error saving your configuration data.');
-                console.log(err.message);
+                console.log(err);
                 return;
             }
             console.log('Configuration saved successfully.')
@@ -1913,52 +2004,58 @@ function saveCollisionProfiles() {
     }
     catch (err) {
         console.log('There has been an error saving your configuration data.')
-        console.log(err.message);
+        console.log(err);
     }
 }
 
 function updateAnchorWatch() {
 	
-	//console.log('anchorWatchControl',anchorWatchControl,savePositionInterval);
+	try {
+		//console.log('anchorWatchControl',anchorWatchControl,savePositionInterval);
+		
+		// if anchored, then record position every 30 secs
+		// otherwise if underway, then record position every 2 secs
+		savePositionInterval = (anchorWatchControl.setAnchor) ? savePositionIntervalWhenAnchored : savePositionIntervalWhenUnderway;
 	
-	// if anchored, then record position every 30 secs
-	// otherwise if underway, then record position everry 2 secs
-	savePositionInterval = (anchorWatchControl.setAnchor) ? savePositionIntervalWhenAnchored : savePositionIntervalWhenUnderway;
-
-    if (!anchorWatchControl.setAnchor) {
-        return;
-    }
-    
-    // in meters
-    anchorWatchControl.distanceToAnchor = geolib.getDistance(
-            {latitude: gps.lat, longitude: gps.lon},
-            {latitude: anchorWatchControl.anchorPosition.a / 1e7, longitude: anchorWatchControl.anchorPosition.o / 1e7}
-        );
-    
-    anchorWatchControl.bearingToAnchor = Math.round(geolib.getRhumbLineBearing(
-            {latitude: gps.lat, longitude: gps.lon},
-            {latitude: anchorWatchControl.anchorPosition.a / 1e7, longitude: anchorWatchControl.anchorPosition.o / 1e7}
-        ));
-
-    anchorWatchControl.alarmTriggered = (anchorWatchControl.distanceToAnchor > anchorWatchControl.alarmRadius) ? 1 : 0;
-    
-    if (anchorWatchControl.alarmsEnabled == 1 && anchorWatchControl.alarmTriggered == 1) {
-    	startAlarm();
-    }
+	    if (!anchorWatchControl.setAnchor) {
+	        return;
+	    }
+	    
+	    // in meters
+	    anchorWatchControl.distanceToAnchor = geolib.getDistance(
+	            {latitude: gps.lat, longitude: gps.lon},
+	            {latitude: anchorWatchControl.anchorPosition.a / 1e7, longitude: anchorWatchControl.anchorPosition.o / 1e7}
+	        );
+	    
+	    anchorWatchControl.bearingToAnchor = Math.round(geolib.getRhumbLineBearing(
+	            {latitude: gps.lat, longitude: gps.lon},
+	            {latitude: anchorWatchControl.anchorPosition.a / 1e7, longitude: anchorWatchControl.anchorPosition.o / 1e7}
+	        ));
+	
+	    anchorWatchControl.alarmTriggered = (anchorWatchControl.distanceToAnchor > anchorWatchControl.alarmRadius) ? 1 : 0;
+	    
+	    if (anchorWatchControl.alarmsEnabled == 1 && anchorWatchControl.alarmTriggered == 1) {
+			console.log('anchor alarm triggered:',anchorWatchControl);
+	    	startAlarm();
+	    }
+	}
+	catch(err) {
+	    console.log('error in updateAnchorWatch',err.message,err);
+	}
 }
 
 function startAlarm() {
 	if (!alarm) {
-		console.log('alarm on');
+		console.log('startAlarm');
 		// toggle led on and off every 500 ms
 		alarm = setInterval(function() {
 			try {
 				var onOff = buzzer.readSync() ^ 1;
-				console.log('alarm!',onOff);
+				//console.log('alarm!',onOff);
 				buzzer.writeSync(onOff);
 			}
 		    catch (err) {
-		        console.log('error in startAlarm',err.message);
+		        console.log('error in startAlarm',err);
 		    }
 		}, 500);
 	}
@@ -1966,12 +2063,13 @@ function startAlarm() {
 
 function stopAlarm() {
 	try {
+		console.log('stopAlarm');
 	    clearInterval(alarm);
 		alarm = undefined;
 	    buzzer.writeSync(0);
 	}
     catch (err) {
-        console.log('error in stopAlarm',err.message);
+        console.log('error in stopAlarm',err);
     }
 }
 
@@ -1994,6 +2092,7 @@ function muteAlarms() {
 }
 
 function exit() {
+	aisProxy.end();
     stopAlarm();
 	buzzer.unexport();
 	button.unexport();
