@@ -1,9 +1,9 @@
  "use strict";
 
-const AisEncode  = require ("ggencoder").AisEncode;
 const AisDecode  = require ("ggencoder").AisDecode;
-const NmeaEncode = require ("ggencoder").NmeaEncode;
-const NmeaDecode = require ("ggencoder").NmeaDecode;
+//const NmeaDecode = require ("ggencoder").NmeaDecode;
+
+const nmea = require("nmea-simple");
 
 const express = require('express');
 const app = express();
@@ -14,7 +14,6 @@ var sse = new SSE();
 
 const net = require('net');
 const geolib = require('geolib');
-const Magvar = require('magvar');
 const fs = require('fs');
 
 const mdns = require('multicast-dns')();
@@ -31,6 +30,7 @@ const { exec } = require('child_process');
 var Gpio = undefined;
 var buzzer = undefined;
 var button = undefined;
+
 try {
     Gpio = require('onoff').Gpio;
     
@@ -66,10 +66,7 @@ const ageOldTargetsTTL = 20;
 // durability) which would prevent saving
 const saveCollisionProfilesEnabled = false;
 
-const nmeaServerEnabled = false;
 const nmeaServerPort = 39150;
-const nmeaServerXmitInterval = 5000;
-
 const vesperSmartAisHttpPort = 39151;
 
 const myMmsi = '368204530';
@@ -128,6 +125,9 @@ var anchorWatchControl = {
 */
 
 var alarm;
+var targetAlarm = false;
+var targetAlarmUpdate = false;
+var anchorAlarm = false
 var positions = [];
 // save position every 2 seconds when underway. this changes to every 30 seconds when anchored.
 var savePositionIntervalWhenUnderway = 2000;
@@ -935,6 +935,12 @@ app.all('*', function(req, res) {
 
 app.listen(vesperSmartAisHttpPort,"0.0.0.0", () => console.log(`HTTP server listening on port ${vesperSmartAisHttpPort}!`));
 
+async function everyFiveSeconds() {
+	await updateAllTargets();
+	await updateAnchorWatch();
+	await manageAlarms();
+}
+
 // send heartbeat
 setInterval(() => {
     // console.log('getMaxListeners()',sse.getMaxListeners());
@@ -1002,17 +1008,14 @@ setInterval(() => {
 // send VesselPositionHistory
 setInterval(() => {
         sendSseMsg("VesselPositionHistory", positions);
-}, 1000);
+}, 15000);
 
 // save position every 30 seconds
 //setInterval(savePosition, 30000);
 savePosition();
 
-// update targets and alarms every 5 seconds
-setInterval(updateAllTargets, 5000);
-
-// update anchor watch every 5 seconds
-setInterval(updateAnchorWatch, 5000);
+// update data models every 5 seconds
+setInterval(everyFiveSeconds, 5000);
 
 function sendSseMsg(name,data) {
     var json = JSON.stringify(data);
@@ -1022,174 +1025,10 @@ function sendSseMsg(name,data) {
 // ======================= NMEA SERVER ========================
 // listens to requests from mobile app
 
-var aisProxy = proxy.createProxy(nmeaServerPort, aisHostname, aisPort, {hostname: '0.0.0.0',quiet: true});
-
-
-if (nmeaServerEnabled) {
-
-    var connectionNumber = 0;
-    let connections = [];
-    
-    try {
-    	const nmeaServer = net.createServer((connection) => {
-    	    
-    	    connectionNumber++;
-    	    connection.id = connectionNumber;
-    	    connections.push(connection);
-    	    
-    	    console.log(`NMEA Server: new connection ${connectionNumber} ${connection.remoteAddress}:${connection.remotePort}`);
-    	    console.log('connections',connections.length);
-    	    
-    	    connection.on('data', data => {
-    	        console.log(`NMEA Server: connection ${connection.id} DATA ${connection.remoteAddress}:${connection.remotePort} ${data.toString('latin1')}`);
-    	    });
-    
-    	    connection.on('close', () => {
-    	        console.log(`NMEA Server: connection ${connection.id} CLOSE ${connection.remoteAddress}:${connection.remotePort}`);
-    	        connections.splice(connections.indexOf(connection), 1);
-    	        console.log('connections',connections.length);
-    	    });
-    	    
-    	    connection.on('end', () => {
-    	        console.log(`NMEA Server: connection ${connection.id} END ${connection.remoteAddress}:${connection.remotePort}`);
-    	        // connections.splice(connections.indexOf(connection), 1);
-    	        console.log('connections',connections.length);
-    	    });
-    	    
-    	    connection.on('error', err => {
-    	        console.log(`****** NMEA Server: connection ${connection.id} ERROR`);
-    	        console.log(err,err.stack);
-    	    });
-    	    
-    	});
-    
-    	nmeaServer.on('error', (err) => {
-    	    console.log('NMEA Server: whoops!',err);
-    	    // console.error;
-    	    // throw err;
-    	});
-    
-    	nmeaServer.listen(nmeaServerPort, () => {
-    	    console.log(`NMEA Server: listening on ${nmeaServer.address().address}:${nmeaServer.address().port}`);
-    	});
-    }
-    catch (err) {
-        console.log('error in NMEA server',err)
-    }
-    
-    function broadcast(msg) {
-        try {
-        	connections.map(connection => {
-        		connection.write(msg);
-            });
-        }
-        catch (err) {
-            console.log('error in broadcast',err)
-        }
-    }
-    
-    // $GPRMC = Recommended minimum specific GPS/Transit data
-    // $GPVTG = Track Made Good and Ground Speed
-    // $GPGGA = Global Positioning System Fix Data
-    // $GPGSA = GPS DOP and active satellites
-    // $GPGSV = GPS Satellites in view
-    // $GPGLL = Geographic Position, Latitude / Longitude and time
-    
-    // the app wants to see traffic on port 39150. if it does not, it will
-    // periodically reinitialize. i guess this is a mechanism to try and restore
-    // what it perceives as lost connectivity with the AIS unit. The app does
-    // not actually appear to use this data though - instead relying on getting
-    // everything it needs from the web interfaces.
-    
-	// send ais nmea data
-    setInterval(function(){
-        //console.log('start tcp xmit');
-        
-        var message = '';
-        
-        /*
-         * var data =
-         * `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-         * $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-         * $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-         * $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-         * $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-         * $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-         * $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75`;
-         * socket.write(data);
-         */
-    
-        if (gps.lat === undefined 
-                || gps.lon === undefined
-                || gps.sog === undefined
-                || gps.cog === undefined) {
-            console.log('cant generate nmea gps message: missing data');
-            return;
-        } else {
-            // console.log('gps',gps);
-            // encode NMEA message
-            var nmeaMsg = new NmeaEncode({ 
-                // standard class B Position report
-                // msgtype : 18, <== NOTE: this breaks things!
-                lat        : gps.lat,
-                lon        : gps.lon,
-                cog        : gps.cog,
-                sog        : gps.sog
-            }); 
-            
-            // console.log(nmeaMsg,nmeaMsg.valid,nmeaMsg.nmea);
-            if (nmeaMsg.valid) message += nmeaMsg.nmea + '\n';
-        }
-        
-        // FIXME should we send the proper ais class A vs B message ?
-        
-        for (var mmsi in targets) {
-            var target = targets[mmsi];
-    
-            // encode AIS message
-            var encMsg = new AisEncode({
-                aistype    : 3,
-                mmsi       : target.mmsi,
-                lat: target.lat,
-                lon: target.lon,
-                cog: target.cog,
-                sog: target.sog,
-                navstatus: target.navstatus
-            }); 
-            
-            // console.log(encMsg,encMsg.valid,encMsg.nmea);
-            if (encMsg.valid) message += encMsg.nmea + '\n';
-    
-            // encode AIS message
-            var encMsg = new AisEncode ({
-                aistype    : 5,
-                mmsi       : target.mmsi,
-                callsign: target.callsign,
-                shipname: target.shipname,
-                cargo: target.cargo,
-            }); 
-            
-            // console.log(encMsg,encMsg.valid,encMsg.nmea);
-            if (encMsg.valid) message += encMsg.nmea + '\n';
-        }
-        
-        broadcast(message);
-        
-	    // message =
-	    // `$GPRMC,203538.00,A,3732.60174,N,07619.93740,W,0.047,77.90,201018,10.96,W,A*35
-	    // $GPVTG,77.90,T,88.87,M,0.047,N,0.087,K,A*29
-	    // $GPGGA,203538.00,3732.60174,N,07619.93740,W,1,06,1.48,-14.7,M,-35.6,M,,*79
-	    // $GPGSA,A,3,21,32,10,24,20,15,,,,,,,2.96,1.48,2.56*00
-	    // $GPGSV,2,1,08,08,03,314,31,10,46,313,39,15,35,057,36,20,74,341,35*71
-	    // $GPGSV,2,2,08,21,53,204,41,24,58,079,32,27,,,35,32,28,257,36*4E
-	    // $GPGLL,3732.60174,N,07619.93740,W,203538.00,A,A*75
-	    // `;
-	    //    
-	    // broadcast(message);
-    
-    }, nmeaServerXmitInterval);
-
-}
+var aisProxy = proxy.createProxy(nmeaServerPort, aisHostname, aisPort, {
+	hostname: '0.0.0.0',
+	quiet: true
+});
 
 // ======================= TCP CLIENT ========================
 // gets data from AIS
@@ -1214,9 +1053,9 @@ function connect() {
         
         while (eol > -1) {
             try {
-                var aisMessage = data.substring(0, eol).toString('latin1');
-                // console.log('aisMessage',aisMessage);
-                processAisMessage(aisMessage);
+                var message = data.substring(0, eol).toString('latin1');
+                // console.log('message',message);
+                processNmeaMessage(message);
             }
             catch (err) {
                 console.log('error in connect.on.data', err, data, eol);
@@ -1262,13 +1101,24 @@ function checkAisConnection() {
     }
 }
 
-function processAisMessage(aisMessage) {
+function processNmeaMessage(message) {
     
-    // console.log('processAIScommand',aisMessage);
+    // console.log('processNmeaMessage',message);
 
-    // decode and AIS message
-    if (aisMessage.startsWith('!AI')) { 
-        var decMsg = new AisDecode (aisMessage, aisSession);
+    // decode AIS message
+    if (message.startsWith('!AI')) { 
+		processAisMessage(message);
+    }
+    
+	// decoe GPS message
+    if (message.startsWith('$GPRMC')) {
+		processRmcMessage(message);        
+    }
+}
+
+function processAisMessage(message) {
+	try {
+		const decMsg = new AisDecode (message, aisSession);
         //console.log ('%j', decMsg);
 
         // ignore if not valid, no mmsi, or is my mmsi
@@ -1311,7 +1161,9 @@ function processAisMessage(aisMessage) {
         }
 
     	if (decMsg.sog !== undefined) {
-    	    target.sog = decMsg.sog; 
+			// 102.3 = speed not available
+			// 102.2 = speed is 102.2 or greater
+    	    target.sog = (decMsg.sog <  102) ? decMsg.sog : 0; 
     	}
 
     	if (decMsg.cargo !== undefined) {
@@ -1398,68 +1250,39 @@ function processAisMessage(aisMessage) {
 
     	// console.log('target',target);
     	// console.log('targets',targets);
-
-    }
-    
-    // decode NMEA message
-    // FIXME: need to get current GMT time from GPS and update RPi clock from
-    // that -
-    // FIXME: only look at GPRMC msgs to work around ggencoder bug with GGA msgs
-    if (aisMessage.startsWith('$GPRMC')) {
-        var decMsg = new NmeaDecode (aisMessage);
-        // console.log ('%j', decMsg);
-        
-	    // FIXME: add GPS accuracy and satellite data... meh
-		
-        if (decMsg.valid) {
-            if (decMsg.lat !== undefined) {
-            	gps.lat = decMsg.lat;
-            	gps.lon = decMsg.lon;
-            	gps.magvar = Magvar.Get(gps.lat, gps.lon);
-            	
-            	// FIXME: working around ggdecoder bug that returns incorrect
-                // date
-            	// 194431.00 hhmmss
-            	// 031219 ddmmyy
-
-				// month starts at zero
-            	gps.time = Math.round(new Date(Date.UTC(
-                        '20' + decMsg.day.substring(4,6),
-                        decMsg.day.substring(2,4) - 1,
-                        decMsg.day.substring(0,2),
-                        decMsg.time.substring(0,2),
-                        decMsg.time.substring(2,4),
-                        decMsg.time.substring(4,6)
-                )).getTime() / 1000);
-
-				//console.log( decMsg.time,decMsg.day,decMsg.date,new Date(gps.time*1000) );
-            	
-            	if (updateClock) {
-                    // reset system time if variance is greater than 3 seconds
-                    var clockDrift = Math.abs(new Date().getTime()/1000 - gps.time);
-					//console.log('*** clockDrift',clockDrift,new Date(),new Date().getTime()/1000,gps.time);
-                    if ( clockDrift > maxClockDriftSecs ) {
-                        console.log('*** updating system time - clockDrift',clockDrift, new Date(), decMsg);
-                        setSystemTime();
-                    }
-            	}
-            }
+	}	
+	catch (err) {
+	    console.log('error in processAisMessage',err,message);
+	}
 	
-            if (decMsg.cog !== undefined) {
-                gps.cog = decMsg.cog;
-            }
+}
 
-            if (decMsg.sog !== undefined) {
-                //gps.sog = decMsg.sog;
-                gps.sog = parseFloat(decMsg.nmea[7])
-                // decMsg.sog; this is actually m/s with 1 decimal place... not
-                // what we want. so we grab the raw nmea value above
-            }
+function processRmcMessage(message) {
+	try {
+		const rmc = nmea.parseNmeaSentence(message);
+		
+		gps.lat = rmc.latitude;
+		gps.lon = rmc.longitude;
+		gps.magvar = rmc.variationDirection === 'E' ? rmc.variation : -rmc.variation;
+		gps.time = Math.round(rmc.datetime.getTime()/1000);
+		gps.cog = rmc.trackTrue;
+		gps.sog = rmc.speedKnots;
+		
+		//console.log(new Date(),rmc,gps);
+	
+		if (updateClock) {
+	        // reset system time if variance is greater than 3 seconds
+	        var clockDrift = Math.abs(new Date().getTime()/1000 - gps.time);
+	        if ( clockDrift > maxClockDriftSecs ) {
+	            console.log('*** updating system time - clockDrift',clockDrift, new Date(), rmc.datetime);
+	            setSystemTime();
+	        }
+		}
+	}
+	catch (err) {
+	    console.log('error in processRmcMessage',err,message);
+	}
 
-            // console.log('gps',gps);
-        }
-        
-    }
 }
 
 function setAnchored() {
@@ -1571,38 +1394,6 @@ function setSystemTime() {
         // 0123456789012345678
         // 2019-12-11T20:13:47.597Z
         
-        // exec console.log
-
-/*
-Sep 11 16:35:20 raspberrypi0 npm[9331]: *** updating system time - clockDrift 57486069118.583 2021-09-11T15:35:20.584Z NmeaDecode {
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   nmea:
-Sep 11 16:35:20 raspberrypi0 npm[9331]:    [ '$GPRMC',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      '153 22.00',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      'A',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      '4124.9904&',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      'N',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      '07114.34552',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      'W\b5.024',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      '104.21',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      '110921',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      '13.50',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      'W',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:      'A*09\r' ],
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   valid: true,
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   cmd: 2,
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   mssi: 0,
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   time: '153 22.00',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   lat: NaN,
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   lon: 71.239092,
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   sog: 53.6,
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   cog: 110921,
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   day: '13.50',
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   alt: NaN,
-Sep 11 16:35:20 raspberrypi0 npm[9331]:   date: 1356966202000 }
-Sep 11 16:35:20 raspberrypi0 npm[9331]: setting system time -55854694598
-*/
-
-
         var now = new Date(gps.time * 1000).toISOString();
         
         exec('sudo date --utc ' 
@@ -1616,27 +1407,28 @@ Sep 11 16:35:20 raspberrypi0 npm[9331]: setting system time -55854694598
     }
 }
 
-function updateAllTargets() {
+async function updateAllTargets() {
 	try {
 	    addCoords(gps);
 		addSpeed(gps);
+		targetAlarmUpdate = false;
+		
 	    for (var mmsi in targets) {
 	    	var target = targets[mmsi];
-	    	var targetDeleted = false;
 	
-	    	if (ageOldTargets) {
-	    	    targetDeleted = ageOutOldTargets(target);
-	    	}
+	    	if ( ageOldTargets && (new Date() - new Date(target.lastSeen))/1000/60 > ageOldTargetsTTL ) {
+        		console.log('deleting',target.mmsi,target.lastSeen,new Date().toISOString());
+		        delete targets[target.mmsi];
+				continue;
+			}
 	
-	    	if (!targetDeleted) {
-	            calculateRangeAndBearing(target);
-	            updateCpa(target);
-	            evaluateAlarms(target);
-	    	}
+            calculateRangeAndBearing(target);
+            updateCpa(target);
+            evaluateAlarms(target);
 	    	
 	    	// console.log(target);
 	    }
-	    
+		targetAlarm = targetAlarmUpdate;	    
 	    // console.log(gps);
 	}
 	catch(err) {
@@ -1650,9 +1442,6 @@ function savePosition() {
 	try {
 		if (gps.lat !== undefined) {
 			positions.unshift({
-	//            lat: gps.lat,
-	//            lon: gps.lon,
-	//            time: gps.time,
 	            a: Math.round(gps.lat * 1e7),
 	            o: Math.round(gps.lon * 1e7),
 	            t: gps.time
@@ -1705,14 +1494,6 @@ function savePosition() {
 		setTimeout(savePosition, savePositionInterval);
 	}
 	
-}
-
-function ageOutOldTargets(target) {
-    if ( (new Date() - new Date(target.lastSeen))/1000/60 > ageOldTargetsTTL ) {
-        console.log('deleting',target.mmsi,target.lastSeen,new Date().toISOString());
-        delete targets[target.mmsi];
-        return true;
-    }
 }
 
 // from: http://geomalgorithms.com/a07-_distance.html
@@ -1870,7 +1651,8 @@ function evaluateAlarms(target) {
         target.order = 8190;
         if (!target.alarmMuted) {
 			console.log('collision alarm triggered for:',target);
-        	startAlarm();
+			targetAlarmUpdate = true;
+        	//startAlarm();
         }
     }
     // threat
@@ -2008,7 +1790,7 @@ function saveCollisionProfiles() {
     }
 }
 
-function updateAnchorWatch() {
+async function updateAnchorWatch() {
 	
 	try {
 		//console.log('anchorWatchControl',anchorWatchControl,savePositionInterval);
@@ -2018,6 +1800,7 @@ function updateAnchorWatch() {
 		savePositionInterval = (anchorWatchControl.setAnchor) ? savePositionIntervalWhenAnchored : savePositionIntervalWhenUnderway;
 	
 	    if (!anchorWatchControl.setAnchor) {
+			anchorAlarm = false;
 	        return;
 	    }
 	    
@@ -2033,14 +1816,34 @@ function updateAnchorWatch() {
 	        ));
 	
 	    anchorWatchControl.alarmTriggered = (anchorWatchControl.distanceToAnchor > anchorWatchControl.alarmRadius) ? 1 : 0;
-	    
+
 	    if (anchorWatchControl.alarmsEnabled == 1 && anchorWatchControl.alarmTriggered == 1) {
 			console.log('anchor alarm triggered:',anchorWatchControl);
-	    	startAlarm();
-	    }
+			anchorAlarm = true;
+	    	//startAlarm();
+	    } else {
+			anchorAlarm = false;
+		}
 	}
 	catch(err) {
-	    console.log('error in updateAnchorWatch',err.message,err);
+	    console.log('error in updateAnchorWatch',err.message,err,anchorWatchControl,gps);
+	}
+}
+
+async function manageAlarms() {
+	// if there is an alarm condition
+	if ( targetAlarm || anchorAlarm ) {
+		// if the alarm is not active, then turn it on
+		if (!alarm) {
+			startAlarm();
+		}
+	} 
+	// else (there is no alarm condition)
+	else {
+		// if the alarm is active, then turn it off	
+		if (alarm) {
+			stopAlarm();
+		}
 	}
 }
 
