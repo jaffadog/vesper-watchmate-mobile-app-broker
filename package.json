@@ -14,6 +14,7 @@
 		"ggencoder": "^1.0.2",
 		"ip": "^1.1.5",
 		"lethexa-motionpredict": "^0.4.1",
+		"lodash": "^4.17.21",
 		"multicast-dns": "^7.2.3",
 		"nmea-simple": "^3.2.0",
 		"node-tcp-proxy": "0.0.21",

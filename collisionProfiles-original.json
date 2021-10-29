@@ -1,75 +1,75 @@
 {
-   "current":"harbor",
-   "anchor":{
-      "warning":{
-         "cpa":0,
-         "tcpa":3600,
-         "range":48,
-         "speed":0
-      },
-      "danger":{
-         "cpa":0,
-         "tcpa":3600,
-         "range":48,
-         "speed":0
-      },
-      "guard":{
-         "range":0,
-         "speed":0
-      }
-   },
-   "harbor":{
-      "warning":{
-         "cpa":0.5,
-         "tcpa":600,
-         "range":48,
-         "speed":0.5
-      },
-      "danger":{
-         "cpa":0.1,
-         "tcpa":300,
-         "range":48,
-         "speed":3
-      },
-      "guard":{
-         "range":0,
-         "speed":0
-      }
-   },
-   "coastal":{
-      "warning":{
-         "cpa":2,
-         "tcpa":1800,
-         "range":48,
-         "speed":0
-      },
-      "danger":{
-         "cpa":1,
-         "tcpa":450,
-         "range":48,
-         "speed":0.5
-      },
-      "guard":{
-         "range":0,
-         "speed":0
-      }
-   },
-   "offshore":{
-      "warning":{
-         "cpa":4,
-         "tcpa":1800,
-         "range":48,
-         "speed":0
-      },
-      "danger":{
-         "cpa":2,
-         "tcpa":900,
-         "range":48,
-         "speed":0
-      },
-      "guard":{
-         "range":0,
-         "speed":0
-      }
-   }
+	"current": "harbor",
+	"anchor": {
+		"warning": {
+			"cpa": 0,
+			"tcpa": 3600,
+			"range": 48,
+			"speed": 0
+		},
+		"danger": {
+			"cpa": 0,
+			"tcpa": 3600,
+			"range": 48,
+			"speed": 0
+		},
+		"guard": {
+			"range": 0,
+			"speed": 0
+		}
+	},
+	"harbor": {
+		"warning": {
+			"cpa": 0.5,
+			"tcpa": 600,
+			"range": 48,
+			"speed": 0.5
+		},
+		"danger": {
+			"cpa": 0.1,
+			"tcpa": 300,
+			"range": 48,
+			"speed": 3
+		},
+		"guard": {
+			"range": 0,
+			"speed": 0
+		}
+	},
+	"coastal": {
+		"warning": {
+			"cpa": 2,
+			"tcpa": 1800,
+			"range": 48,
+			"speed": 0
+		},
+		"danger": {
+			"cpa": 1,
+			"tcpa": 450,
+			"range": 48,
+			"speed": 0.5
+		},
+		"guard": {
+			"range": 0,
+			"speed": 0
+		}
+	},
+	"offshore": {
+		"warning": {
+			"cpa": 4,
+			"tcpa": 1800,
+			"range": 48,
+			"speed": 0
+		},
+		"danger": {
+			"cpa": 2,
+			"tcpa": 900,
+			"range": 48,
+			"speed": 0
+		},
+		"guard": {
+			"range": 0,
+			"speed": 0
+		}
+	}
 }

@@ -3,6 +3,8 @@
 const AisDecode  = require ("ggencoder").AisDecode;
 //const NmeaDecode = require ("ggencoder").NmeaDecode;
 
+var _ = require('lodash');
+
 const nmea = require("nmea-simple");
 
 const express = require('express');
@@ -660,7 +662,11 @@ app.use(function(req, res, next) {
 	next();
 });
 
-app.use(bodyParser.urlencoded({ extended: true }));
+// parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: false }))
+//app.use(bodyParser.urlencoded({ extended: true }));
+
+// parse application/json
 app.use(bodyParser.json());
 
 // sanity
@@ -746,6 +752,31 @@ app.get('/v3/control', (req, res) => {
 	}
 });
 
+// GET /v3/tickle?xxxx
+// GET /v3/tickle?AnchorWatch
+// GET /v3/tickle?AnchorWatchControl
+app.get('/v3/tickle', (req, res) => {
+	console.log('req.query',req.query);
+
+	// GET /v3/tickle?AnchorWatch
+	if (req.query.AnchorWatch!==undefined) {
+		console.log('GET /v3/tickle?AnchorWatch');
+		sendSseMsg("VesselPositionHistory", positions);
+		res.sendStatus(200);
+    } 
+	// GET /v3/tickle?AnchorWatchControl
+	else if (req.query.AnchorWatchControl!==undefined) {
+		console.log('GET /v3/tickle?AnchorWatchControl');
+		// do what?
+		res.sendStatus(200);
+    } 
+	// OTHER
+	else {
+        console.log(`*** sending 404 for ${req.method} ${req.originalUrl} ${req.query}`);
+        res.sendStatus(404);
+	}
+});
+
 // GET /alarms/get_current_list
 app.get('/alarms/get_current_list', (req, res) => {
 
@@ -792,10 +823,19 @@ app.get('/v3/watchMate/collisionProfiles', (req, res) => {
 });
 
 // PUT /v3/watchMate/collisionProfiles
+// PUT /v3/watchMate/collisionProfiles { '{"harbor":{"guard":{"range":0.5}}}': '' }
+// android: 
+// 		guard, danger, warning
+//		'content-type': 'application/x-www-form-urlencoded'
+// ios: 
+// 		guard, danger, warning... PLUS... threat. threat is same as warning.
+//		'content-type': 'application/json'
 app.put('/v3/watchMate/collisionProfiles', (req, res) => {
-    // console.log(req.body);
-    // the body is already parsed to json by express
-    collisionProfiles = req.body;
+	
+    console.log('PUT /v3/watchMate/collisionProfiles',req.body);
+
+	mergePutData(req,collisionProfiles);
+
     saveCollisionProfiles();
     res.sendStatus(204);
 });
@@ -804,6 +844,22 @@ app.put('/v3/watchMate/collisionProfiles', (req, res) => {
 app.get('/prefs/start_notifying', (req, res) => {
     res.send( new Buffer.from('Hello','latin1') );
 });
+
+function mergePutData(req,originalObject) {
+	var contentType = req.header('content-type');
+	var update = undefined;
+	
+	if (contentType && contentType === 'application/json') {
+	    update = req.body;
+	} else {
+    	update = JSON.parse(Object.keys(req.body)[0])
+	}
+	
+	//console.log('update',update);
+	
+	_.merge(originalObject,update);
+	//console.log(originalObject);
+}
 
 // PUT /v3/anchorwatch/AnchorWatchControl
 // { '{"setAnchor":true,"alarmsEnabled":true,"anchorPosition":{"a":413515813,"o":-723778936,"t":1581064687}}': '' }
@@ -818,17 +874,13 @@ Feb 11 00:52:52 raspberrypi0 npm[1174]:    { '{"setAnchor":true,"alarmsEnabled":
 */
 
 app.put('/v3/anchorwatch/AnchorWatchControl', (req, res) => {
-    console.log(req.body);
+    console.log('PUT /v3/anchorwatch/AnchorWatchControl',req.body);
     //console.log('req',req);
     //console.log('res',res);
     // the body is already parsed to json by express
     //anchorWatchControl = req.body;
-    var data = JSON.parse(Object.keys(req.body)[0])
-    console.log('data=',data);
+	mergePutData(req,anchorWatchControl);
 
-	Object.assign(anchorWatchControl,data);
-	//console.log('anchorWatchControl=',anchorWatchControl);
-		
 	/*
 	anchorWatchControl.setAnchor = data.setAnchor;
 	anchorWatchControl.alarmsEnabled = data.alarmsEnabled;
@@ -1005,10 +1057,10 @@ setInterval(() => {
     sendSseMsg("AnchorWatch", anchorWatchJson);
 }, 1000);
 
-// send VesselPositionHistory
+// send VesselPositionHistory (BIG message)
 setInterval(() => {
         sendSseMsg("VesselPositionHistory", positions);
-}, 15000);
+}, 5000);
 
 // save position every 30 seconds
 //setInterval(savePosition, 30000);
@@ -1611,104 +1663,108 @@ function dist(u,v) {
 }
 
 function evaluateAlarms(target) {
-    // guard alarm
-    target.guardAlarm = (
-            target.range < collisionProfiles[collisionProfiles.current].guard.range 
-            && (target.sog > collisionProfiles[collisionProfiles.current].guard.speed
-                    || collisionProfiles[collisionProfiles.current].guard.speed == 0)
-    );
-    
-    // collision alarm
-    target.collisionAlarm = (
-            target.cpa < collisionProfiles[collisionProfiles.current].danger.cpa
-            && target.tcpa > 0
-            && target.tcpa < collisionProfiles[collisionProfiles.current].danger.tcpa 
-            && (target.sog > collisionProfiles[collisionProfiles.current].danger.speed
-                    || collisionProfiles[collisionProfiles.current].danger.speed == 0)
-    );
-        
-    // collision warning
-    target.collisionWarning = (
-            target.cpa < collisionProfiles[collisionProfiles.current].warning.cpa
-            && target.tcpa > 0
-            && target.tcpa < collisionProfiles[collisionProfiles.current].warning.tcpa 
-            && (target.sog > collisionProfiles[collisionProfiles.current].warning.speed
-                    || collisionProfiles[collisionProfiles.current].warning.speed == 0)
-    );
-    
-    target.sartAlarm = (target.mmsi.startsWith('970'));
-    target.mobAlarm = (target.mmsi.startsWith('972'));
-    target.epirbAlarm = (target.mmsi.startsWith('974'));
-    
-    // alarm
-    if (target.guardAlarm 
-            || target.collisionAlarm 
-            || target.sartAlarm 
-            || target.mobAlarm 
-            || target.epirbAlarm) {
-        target.dangerState = 'danger';
-        target.filteredState = 'show';
-        target.order = 8190;
-        if (!target.alarmMuted) {
-			console.log('collision alarm triggered for:',target);
-			targetAlarmUpdate = true;
-        	//startAlarm();
-        }
-    }
-    // threat
-    else if (target.collisionWarning) {
-        // "warning" does not produce orange icons or alarms in the app, but
-        // "threat" does :)
-        target.dangerState = 'threat';
-        target.filteredState = 'show';
-        target.order = 16382;
-    }
-    // none
-    else {
-        target.dangerState = undefined;
-        target.filteredState = 'hide';
-        target.order = 36862;
-    }
-    
-    var alarms = [];
-
-    if (target.guardAlarm) alarms.push('guard');
-    if (target.collisionAlarm || target.collisionWarning) alarms.push('cpa');
-    if (target.sartAlarm) alarms.push('sart');
-    if (target.mobAlarm) alarms.push('mob');
-    if (target.epirbAlarm) alarms.push('epirb');
-
-    target.alarmType = alarms.join(',');
-
-    // sort sooner tcpa targets to top
-    if (target.tcpa > 0) {
-        // sort vessels with any tcpa above vessels that dont have a tcpa
-        target.order -= 1000;
-        // tcpa of 0 seconds reduces order by 1000 (this is an arbitrary
-        // weighting)
-        // tcpa of 60 minutes reduces order by 0
-        var weight = 1000;
-        target.order -= Math.max(0, Math.round(weight - weight*target.tcpa/3600));
-    }
-
-    // sort closer cpa targets to top
-    if (target.cpa > 0) {
-        // cpa of 0 nm reduces order by 2000 (this is an arbitrary weighting)
-        // cpa of 5 nm reduces order by 0
-        var weight = 2000;
-        target.order -= Math.max(0, Math.round(weight - weight*target.cpa/5));
-    }
-
-    // sort closer targets to top
-    if (target.range > 0) {
-        target.order += Math.round(100*target.range);
-    }
-
-    // sort targets with no range to bottom
-    if (target.range === undefined) {
-        target.order += 99999;
-    }
-
+	try {
+	    // guard alarm
+	    target.guardAlarm = (
+	            target.range < collisionProfiles[collisionProfiles.current].guard.range 
+	            && (target.sog > collisionProfiles[collisionProfiles.current].guard.speed
+	                    || collisionProfiles[collisionProfiles.current].guard.speed == 0)
+	    );
+	    
+	    // collision alarm
+	    target.collisionAlarm = (
+	            target.cpa < collisionProfiles[collisionProfiles.current].danger.cpa
+	            && target.tcpa > 0
+	            && target.tcpa < collisionProfiles[collisionProfiles.current].danger.tcpa 
+	            && (target.sog > collisionProfiles[collisionProfiles.current].danger.speed
+	                    || collisionProfiles[collisionProfiles.current].danger.speed == 0)
+	    );
+	        
+	    // collision warning
+	    target.collisionWarning = (
+	            target.cpa < collisionProfiles[collisionProfiles.current].warning.cpa
+	            && target.tcpa > 0
+	            && target.tcpa < collisionProfiles[collisionProfiles.current].warning.tcpa 
+	            && (target.sog > collisionProfiles[collisionProfiles.current].warning.speed
+	                    || collisionProfiles[collisionProfiles.current].warning.speed == 0)
+	    );
+	    
+	    target.sartAlarm = (target.mmsi.startsWith('970'));
+	    target.mobAlarm = (target.mmsi.startsWith('972'));
+	    target.epirbAlarm = (target.mmsi.startsWith('974'));
+	    
+	    // alarm
+	    if (target.guardAlarm 
+	            || target.collisionAlarm 
+	            || target.sartAlarm 
+	            || target.mobAlarm 
+	            || target.epirbAlarm) {
+	        target.dangerState = 'danger';
+	        target.filteredState = 'show';
+	        target.order = 8190;
+	        if (!target.alarmMuted) {
+				console.log('collision alarm triggered for:',target);
+				targetAlarmUpdate = true;
+	        	//startAlarm();
+	        }
+	    }
+	    // threat
+	    else if (target.collisionWarning) {
+	        // "warning" does not produce orange icons or alarms in the app, but
+	        // "threat" does :)
+	        target.dangerState = 'threat';
+	        target.filteredState = 'show';
+	        target.order = 16382;
+	    }
+	    // none
+	    else {
+	        target.dangerState = undefined;
+	        target.filteredState = 'hide';
+	        target.order = 36862;
+	    }
+	    
+	    var alarms = [];
+	
+	    if (target.guardAlarm) alarms.push('guard');
+	    if (target.collisionAlarm || target.collisionWarning) alarms.push('cpa');
+	    if (target.sartAlarm) alarms.push('sart');
+	    if (target.mobAlarm) alarms.push('mob');
+	    if (target.epirbAlarm) alarms.push('epirb');
+	
+	    target.alarmType = alarms.join(',');
+	
+	    // sort sooner tcpa targets to top
+	    if (target.tcpa > 0) {
+	        // sort vessels with any tcpa above vessels that dont have a tcpa
+	        target.order -= 1000;
+	        // tcpa of 0 seconds reduces order by 1000 (this is an arbitrary
+	        // weighting)
+	        // tcpa of 60 minutes reduces order by 0
+	        var weight = 1000;
+	        target.order -= Math.max(0, Math.round(weight - weight*target.tcpa/3600));
+	    }
+	
+	    // sort closer cpa targets to top
+	    if (target.cpa > 0) {
+	        // cpa of 0 nm reduces order by 2000 (this is an arbitrary weighting)
+	        // cpa of 5 nm reduces order by 0
+	        var weight = 2000;
+	        target.order -= Math.max(0, Math.round(weight - weight*target.cpa/5));
+	    }
+	
+	    // sort closer targets to top
+	    if (target.range > 0) {
+	        target.order += Math.round(100*target.range);
+	    }
+	
+	    // sort targets with no range to bottom
+	    if (target.range === undefined) {
+	        target.order += 99999;
+	    }
+	}
+	catch(err) {
+	    console.log('error in evaluateAlarms',err.message);
+	}
 }
 
 function formatCog(cog) {

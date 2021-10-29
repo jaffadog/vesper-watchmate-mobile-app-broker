@@ -1,4 +1,5 @@
 {
+	"current": "anchor",
 	"anchor": {
 		"warning": {
 			"cpa": 0,
@@ -47,7 +48,6 @@
 			"speed": 0
 		}
 	},
-	"current": "anchor",
 	"harbor": {
 		"warning": {
 			"cpa": 4,
